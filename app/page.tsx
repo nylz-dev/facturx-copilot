@@ -1,5 +1,6 @@
 import UploadZone from '@/components/UploadZone';
 import Countdown from '@/components/Countdown';
+import MobileMenu from '@/components/MobileMenu';
 
 export default function Home() {
   return (
@@ -24,10 +25,11 @@ export default function Home() {
           </nav>
           <a
             href="#upload"
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-sm"
+            className="hidden md:inline-block bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-sm"
           >
             Essayer gratuitement →
           </a>
+          <MobileMenu />
         </div>
       </header>
 
@@ -170,7 +172,7 @@ export default function Home() {
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Multi-comptes clients</li>
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Onboarding dédié</li>
               </ul>
-              <a href="mailto:contact@facturxpro.fr" className="block text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 transition-colors text-sm">
+              <a href="mailto:contact@facturexpro.fr" className="block text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 transition-colors text-sm">
                 Nous contacter
               </a>
             </div>
@@ -243,7 +245,7 @@ export default function Home() {
                 <ul className="space-y-1.5 text-slate-400">
                   <li><a href="/mentions-legales" className="hover:text-slate-600">Mentions légales</a></li>
                   <li><a href="/rgpd" className="hover:text-slate-600">Politique RGPD</a></li>
-                  <li><a href="mailto:contact@facturxpro.fr" className="hover:text-slate-600">Contact</a></li>
+                  <li><a href="mailto:contact@facturexpro.fr" className="hover:text-slate-600">Contact</a></li>
                 </ul>
               </div>
             </div>

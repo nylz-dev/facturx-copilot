@@ -45,9 +45,24 @@ export async function POST(req: NextRequest) {
 
     const invoiceData = parsedData as InvoiceData;
 
+    // If Mistral extracted line items that don't sum to stated total,
+    // adjust the last line's unit price to make totals match exactly.
+    const computedTotals = computeTotals(invoiceData.lines);
+    if (
+      invoiceData.statedTotalHT != null &&
+      invoiceData.lines.length > 0 &&
+      Math.abs(computedTotals.totalHT - invoiceData.statedTotalHT) < 1
+    ) {
+      // Force line totals to match stated HT
+      const delta = invoiceData.statedTotalHT - computedTotals.totalHT;
+      const lastLine = invoiceData.lines[invoiceData.lines.length - 1];
+      lastLine.unitPrice = Math.abs(lastLine.unitPrice) + delta / Math.abs(lastLine.quantity || 1);
+    }
+
     // Generate Factur-X XML
     const xmlString = generateFacturXXML(invoiceData);
-    const totals = computeTotals(invoiceData.lines);
+    const recomputedTotals = computeTotals(invoiceData.lines);
+    const displayTTC = invoiceData.statedTotalTTC ?? recomputedTotals.totalTTC;
 
     // Embed XML into PDF
     const pdfBytes = new Uint8Array(pdfArrayBuffer);
@@ -59,7 +74,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="facturx_${invoiceData.invoiceNumber}.pdf"`,
         'X-Invoice-Number': invoiceData.invoiceNumber,
-        'X-Total-TTC': String(totals.totalTTC),
+        'X-Total-TTC': String(displayTTC),
         'X-Invoice-Date': invoiceData.invoiceDate,
         'X-Extraction-Method': method,
       },

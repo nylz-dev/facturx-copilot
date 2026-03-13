@@ -9,34 +9,6 @@ import type { InvoiceData } from './facturx-generator';
 
 const mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY ?? '' });
 
-// --- PDF Text Extraction (PDFs natifs) ---
-
-export async function extractTextFromPdfBuffer(buffer: ArrayBuffer): Promise<string> {
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
-  const loadingTask = pdfjsLib.getDocument({
-    data: buffer,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    useSystemFonts: true,
-  });
-
-  const pdf = await loadingTask.promise;
-  let fullText = '';
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ');
-    fullText += pageText + '\n';
-  }
-
-  return fullText.trim();
-}
-
 // --- OCR via Mistral OCR (PDFs scannés / images) ---
 
 export async function ocrPdfWithMistral(buffer: ArrayBuffer): Promise<string> {
@@ -65,6 +37,7 @@ RÈGLES STRICTES :
 - currency = "EUR" si non précisé
 - country = "FR" si non précisé
 - vatRate = parmi [0, 5.5, 10, 20]
+- statedTotalHT, statedTotalTVA, statedTotalTTC : montants EXACTEMENT tels qu'écrits sur la facture (nombres décimaux)
 - Si une donnée est absente, utilise null ou ""
 - Retourne UNIQUEMENT le JSON brut, sans markdown
 
@@ -74,6 +47,9 @@ STRUCTURE :
   "invoiceDate": "YYYYMMDD",
   "dueDate": "YYYYMMDD ou null",
   "currency": "EUR",
+  "statedTotalHT": number ou null,
+  "statedTotalTVA": number ou null,
+  "statedTotalTTC": number ou null,
   "seller": {
     "name": "string",
     "siret": "string ou null",
@@ -133,27 +109,21 @@ export async function parseInvoiceWithMistral(text: string): Promise<Partial<Inv
   return JSON.parse(clean) as Partial<InvoiceData>;
 }
 
-// --- Main entry: auto-detect text vs scan ---
+// --- Main entry: always use Mistral OCR (handles native + scanned, serverless-safe) ---
 
 export async function extractAndParseInvoice(
   buffer: ArrayBuffer
 ): Promise<{ parsed: Partial<InvoiceData>; method: 'text' | 'ocr' }> {
-  // 1. Try native text extraction
-  let text = await extractTextFromPdfBuffer(buffer);
-  let method: 'text' | 'ocr' = 'text';
+  // Mistral OCR handles both native text PDFs and scanned images
+  const text = await ocrPdfWithMistral(buffer);
 
-  // 2. If text too short, fallback to Mistral OCR
-  if (!text || text.replace(/\s/g, '').length < 100) {
-    text = await ocrPdfWithMistral(buffer);
-    method = 'ocr';
-    if (!text || text.replace(/\s/g, '').length < 50) {
-      throw new Error(
-        'Impossible d\'extraire le contenu du PDF. Vérifiez que le fichier n\'est pas corrompu.'
-      );
-    }
+  if (!text || text.replace(/\s/g, '').length < 50) {
+    throw new Error(
+      "Impossible d'extraire le contenu du PDF. Vérifiez que le fichier n'est pas corrompu."
+    );
   }
 
-  // 3. Parse with Mistral Small
+  // Parse with Mistral Small
   const parsed = await parseInvoiceWithMistral(text);
-  return { parsed, method };
+  return { parsed, method: 'ocr' };
 }

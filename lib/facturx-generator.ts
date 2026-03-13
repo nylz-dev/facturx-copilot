@@ -6,7 +6,8 @@
  */
 
 import { create } from 'xmlbuilder2';
-import { v4 as uuidv4 } from 'uuid';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type XMLBuilder = any;
 
 export interface InvoiceParty {
   name: string;
@@ -38,6 +39,10 @@ export interface InvoiceData {
   paymentMeans?: string;       // ex: "30" = virement, "31" = prélèvement
   iban?: string;
   bic?: string;
+  // Stated totals extracted directly from the PDF (override computed if present)
+  statedTotalHT?: number | null;
+  statedTotalTVA?: number | null;
+  statedTotalTTC?: number | null;
 }
 
 interface VatGroup {
@@ -47,12 +52,17 @@ interface VatGroup {
 }
 
 function formatDate(d: string): string {
-  // Accepts YYYYMMDD or ISO date
   return d.replace(/-/g, '').substring(0, 8);
 }
 
 function roundTo2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Safe string — returns undefined if blank/null so we skip empty elements */
+function str(v: string | null | undefined): string | undefined {
+  const s = (v ?? '').trim();
+  return s.length > 0 ? s : undefined;
 }
 
 export function computeTotals(lines: InvoiceLine[]) {
@@ -61,76 +71,124 @@ export function computeTotals(lines: InvoiceLine[]) {
   let totalTVA = 0;
 
   for (const line of lines) {
-    const lineHT = roundTo2(line.quantity * line.unitPrice);
+    const price = Math.abs(line.unitPrice); // always positive
+    const qty   = Math.abs(line.quantity);
+    const lineHT  = roundTo2(qty * price);
     const lineTVA = roundTo2(lineHT * line.vatRate / 100);
-    totalHT += lineHT;
+    totalHT  += lineHT;
     totalTVA += lineTVA;
 
     if (!vatGroups[line.vatRate]) {
       vatGroups[line.vatRate] = { rate: line.vatRate, baseAmount: 0, vatAmount: 0 };
     }
     vatGroups[line.vatRate].baseAmount += lineHT;
-    vatGroups[line.vatRate].vatAmount += lineTVA;
+    vatGroups[line.vatRate].vatAmount  += lineTVA;
   }
 
   return {
-    totalHT: roundTo2(totalHT),
-    totalTVA: roundTo2(totalTVA),
-    totalTTC: roundTo2(totalHT + totalTVA),
+    totalHT:   roundTo2(totalHT),
+    totalTVA:  roundTo2(totalTVA),
+    totalTTC:  roundTo2(totalHT + totalTVA),
     vatGroups: Object.values(vatGroups),
   };
 }
 
+/** Build a TradeParty node in the correct XSD order:
+ *  Name → SpecifiedLegalOrganization → PostalTradeAddress → SpecifiedTaxRegistration
+ */
+function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty) {
+  parentNode.ele('ram:Name').txt(party.name);
+
+  // SpecifiedLegalOrganization (SIRET) — no schemeID, not in EN16931 codelist
+  const siret = str(party.siret);
+  if (siret) {
+    parentNode.ele('ram:SpecifiedLegalOrganization')
+      .ele('ram:ID').txt(siret).up();
+  }
+
+  // PostalTradeAddress — MUST come before SpecifiedTaxRegistration per XSD
+  const line1 = str(party.addressLine1);
+  const city  = str(party.city);
+  const zip   = str(party.postalCode);
+  if (line1 || city || zip) {
+    const addr = parentNode.ele('ram:PostalTradeAddress');
+    if (zip)   addr.ele('ram:PostcodeCode').txt(zip);
+    if (line1) addr.ele('ram:LineOne').txt(line1);
+    if (city)  addr.ele('ram:CityName').txt(city);
+    addr.ele('ram:CountryID').txt(str(party.country) ?? 'FR');
+  }
+
+  // SpecifiedTaxRegistration (TVA) — MUST come after PostalTradeAddress
+  const tva = str(party.tvaNumber);
+  if (tva) {
+    parentNode.ele('ram:SpecifiedTaxRegistration')
+      .ele('ram:ID', { schemeID: 'VA' }).txt(tva).up();
+  }
+}
+
 export function generateFacturXXML(invoice: InvoiceData): string {
   const currency = invoice.currency ?? 'EUR';
-  const country = (p: InvoiceParty) => p.country ?? 'FR';
-  const { totalHT, totalTVA, totalTTC, vatGroups } = computeTotals(invoice.lines);
+  const computed = computeTotals(invoice.lines);
+
+  // Use stated totals from PDF if available (avoids rounding discrepancies)
+  const totalHT  = invoice.statedTotalHT  != null ? roundTo2(invoice.statedTotalHT)  : computed.totalHT;
+  const totalTVA = invoice.statedTotalTVA != null ? roundTo2(invoice.statedTotalTVA) : computed.totalTVA;
+  const totalTTC = invoice.statedTotalTTC != null ? roundTo2(invoice.statedTotalTTC) : computed.totalTTC;
+  const vatGroups = computed.vatGroups;
+  if (invoice.statedTotalTVA != null && vatGroups.length === 1) {
+    vatGroups[0].vatAmount = roundTo2(invoice.statedTotalTVA);
+  }
+
   const invoiceDate = formatDate(invoice.invoiceDate);
-  const dueDate = invoice.dueDate ? formatDate(invoice.dueDate) : invoiceDate;
+  const dueDate     = invoice.dueDate ? formatDate(invoice.dueDate) : invoiceDate;
 
   const doc = create({ version: '1.0', encoding: 'UTF-8' })
     .ele('rsm:CrossIndustryInvoice', {
       'xmlns:rsm': 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
       'xmlns:qdt': 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100',
       'xmlns:ram': 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100',
-      'xmlns:xs': 'http://www.w3.org/2001/XMLSchema',
+      'xmlns:xs':  'http://www.w3.org/2001/XMLSchema',
       'xmlns:udt': 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100',
     });
 
-  // --- ExchangedDocumentContext ---
-  const ctx = doc.ele('rsm:ExchangedDocumentContext');
-  ctx.ele('ram:GuidelineSpecifiedDocumentContextParameter')
+  // ── ExchangedDocumentContext ──────────────────────────────────────────────
+  doc.ele('rsm:ExchangedDocumentContext')
+    .ele('ram:GuidelineSpecifiedDocumentContextParameter')
     .ele('ram:ID').txt('urn:factur-x.eu:1p0:basic').up();
 
-  // --- ExchangedDocument ---
+  // ── ExchangedDocument ─────────────────────────────────────────────────────
   const exDoc = doc.ele('rsm:ExchangedDocument');
   exDoc.ele('ram:ID').txt(invoice.invoiceNumber);
-  exDoc.ele('ram:TypeCode').txt('380'); // Commercial invoice
+  exDoc.ele('ram:TypeCode').txt('380');
   exDoc.ele('ram:IssueDateTime')
     .ele('udt:DateTimeString', { format: '102' }).txt(invoiceDate).up();
-  if (invoice.notes) {
-    exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(invoice.notes).up();
+  const notes = str(invoice.notes);
+  if (notes) {
+    exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(notes).up();
   }
 
-  // --- SupplyChainTradeTransaction ---
+  // ── SupplyChainTradeTransaction ───────────────────────────────────────────
   const tx = doc.ele('rsm:SupplyChainTradeTransaction');
 
   // Line items
   invoice.lines.forEach((line, idx) => {
-    const lineHT = roundTo2(line.quantity * line.unitPrice);
+    const price  = Math.abs(line.unitPrice);
+    const qty    = Math.abs(line.quantity);
+    const lineHT = roundTo2(qty * price);
+
     const item = tx.ele('ram:IncludedSupplyChainTradeLineItem');
     item.ele('ram:AssociatedDocumentLineDocument')
       .ele('ram:LineID').txt(String(idx + 1)).up();
     item.ele('ram:SpecifiedTradeProduct')
-      .ele('ram:Name').txt(line.description).up();
+      .ele('ram:Name').txt(str(line.description) ?? `Ligne ${idx + 1}`).up();
 
-    const lineAgreement = item.ele('ram:SpecifiedLineTradeAgreement');
-    lineAgreement.ele('ram:NetPriceProductTradePrice')
-      .ele('ram:ChargeAmount').txt(line.unitPrice.toFixed(2)).up();
+    item.ele('ram:SpecifiedLineTradeAgreement')
+      .ele('ram:NetPriceProductTradePrice')
+      .ele('ram:ChargeAmount').txt(price.toFixed(2)).up();
 
     item.ele('ram:SpecifiedLineTradeDelivery')
       .ele('ram:BilledQuantity', { unitCode: line.unit ?? 'C62' })
-      .txt(line.quantity.toFixed(4)).up();
+      .txt(qty.toFixed(4)).up();
 
     const lineSett = item.ele('ram:SpecifiedLineTradeSettlement');
     lineSett.ele('ram:ApplicableTradeTax')
@@ -143,60 +201,30 @@ export function generateFacturXXML(invoice: InvoiceData): string {
 
   // Header Trade Agreement
   const agreement = tx.ele('ram:ApplicableHeaderTradeAgreement');
-  // Seller
-  const seller = agreement.ele('ram:SellerTradeParty');
-  seller.ele('ram:Name').txt(invoice.seller.name);
-  if (invoice.seller.siret) {
-    seller.ele('ram:SpecifiedLegalOrganization')
-      .ele('ram:ID', { schemeID: '0002' }).txt(invoice.seller.siret).up();
-  }
-  if (invoice.seller.tvaNumber) {
-    seller.ele('ram:SpecifiedTaxRegistration')
-      .ele('ram:ID', { schemeID: 'VA' }).txt(invoice.seller.tvaNumber).up();
-  }
-  if (invoice.seller.addressLine1 || invoice.seller.city) {
-    const addr = seller.ele('ram:PostalTradeAddress');
-    if (invoice.seller.postalCode) addr.ele('ram:PostcodeCode').txt(invoice.seller.postalCode);
-    if (invoice.seller.addressLine1) addr.ele('ram:LineOne').txt(invoice.seller.addressLine1);
-    if (invoice.seller.city) addr.ele('ram:CityName').txt(invoice.seller.city);
-    addr.ele('ram:CountryID').txt(country(invoice.seller));
-  }
-  // Buyer
-  const buyer = agreement.ele('ram:BuyerTradeParty');
-  buyer.ele('ram:Name').txt(invoice.buyer.name);
-  if (invoice.buyer.siret) {
-    buyer.ele('ram:SpecifiedLegalOrganization')
-      .ele('ram:ID', { schemeID: '0002' }).txt(invoice.buyer.siret).up();
-  }
-  if (invoice.buyer.tvaNumber) {
-    buyer.ele('ram:SpecifiedTaxRegistration')
-      .ele('ram:ID', { schemeID: 'VA' }).txt(invoice.buyer.tvaNumber).up();
-  }
-  if (invoice.buyer.addressLine1 || invoice.buyer.city) {
-    const addr = buyer.ele('ram:PostalTradeAddress');
-    if (invoice.buyer.postalCode) addr.ele('ram:PostcodeCode').txt(invoice.buyer.postalCode);
-    if (invoice.buyer.addressLine1) addr.ele('ram:LineOne').txt(invoice.buyer.addressLine1);
-    if (invoice.buyer.city) addr.ele('ram:CityName').txt(invoice.buyer.city);
-    addr.ele('ram:CountryID').txt(country(invoice.buyer));
-  }
+  addTradeParty(agreement.ele('ram:SellerTradeParty'), invoice.seller);
+  addTradeParty(agreement.ele('ram:BuyerTradeParty'), invoice.buyer);
 
-  // Delivery
-  tx.ele('ram:ApplicableHeaderTradeDelivery');
+  // Delivery — must not be empty, add ActualDeliverySupplyChainEvent with invoice date
+  tx.ele('ram:ApplicableHeaderTradeDelivery')
+    .ele('ram:ActualDeliverySupplyChainEvent')
+    .ele('ram:OccurrenceDateTime')
+    .ele('udt:DateTimeString', { format: '102' }).txt(invoiceDate).up();
 
   // Settlement
   const settlement = tx.ele('ram:ApplicableHeaderTradeSettlement');
+
   if (invoice.iban) {
     const paymentInfo = settlement.ele('ram:SpecifiedTradeSettlementPaymentMeans');
     paymentInfo.ele('ram:TypeCode').txt(invoice.paymentMeans ?? '30');
-    if (invoice.iban) {
-      paymentInfo.ele('ram:PayeePartyCreditorFinancialAccount')
-        .ele('ram:IBANID').txt(invoice.iban).up();
-    }
-    if (invoice.bic) {
+    paymentInfo.ele('ram:PayeePartyCreditorFinancialAccount')
+      .ele('ram:IBANID').txt(invoice.iban).up();
+    const bic = str(invoice.bic);
+    if (bic) {
       paymentInfo.ele('ram:PayeeSpecifiedCreditorFinancialInstitution')
-        .ele('ram:BICID').txt(invoice.bic).up();
+        .ele('ram:BICID').txt(bic).up();
     }
   }
+
   settlement.ele('ram:InvoiceCurrencyCode').txt(currency);
 
   // VAT breakdown
