@@ -19,8 +19,13 @@ export default function Home() {
       <div className="max-w-5xl mx-auto px-6 py-16">
         {/* Hero */}
         <div className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-4 py-2 rounded-full mb-6">
-            <span>🇫🇷</span> Conforme réforme facturation électronique française
+          <div className="flex flex-wrap justify-center gap-2 mb-6">
+            <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-sm font-medium px-4 py-2 rounded-full">
+              <span>🇫🇷</span> Réforme facturation électronique 2026
+            </div>
+            <div className="inline-flex items-center gap-2 bg-green-50 text-green-700 text-sm font-medium px-4 py-2 rounded-full">
+              <span>🔒</span> Données traitées en France — RGPD natif
+            </div>
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4 leading-tight">
             Votre facture PDF devient<br />
@@ -29,6 +34,9 @@ export default function Home() {
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
             À partir du <strong>1er septembre 2026</strong>, toutes les PME françaises devront
             émettre des factures au format hybride Factur-X. Soyez prêt maintenant.
+          </p>
+          <p className="text-sm text-slate-400 mt-3">
+            Fonctionne avec tous les PDFs — natifs ET scannés. Propulsé par Mistral AI 🇫🇷
           </p>
         </div>
 
@@ -48,7 +56,7 @@ export default function Home() {
               {
                 icon: '🤖',
                 title: '2. L\'IA extrait les données',
-                desc: 'Gemini AI lit votre facture et extrait vendeur, acheteur, lignes, TVA, IBAN.',
+                desc: 'Mistral AI (🇫🇷) lit votre facture — texte natif ou scan. Extrait vendeur, acheteur, lignes, TVA, IBAN.',
               },
               {
                 icon: '✅',
@@ -88,7 +96,7 @@ export default function Home() {
               },
               {
                 q: 'Mes données sont-elles sécurisées ?',
-                a: 'Le traitement est éphémère : votre PDF est analysé en mémoire et jamais stocké sur nos serveurs. Le fichier résultant est généré à la volée et transmis directement à votre navigateur.',
+                a: 'Le traitement est 100% éphémère : votre PDF est analysé en mémoire et jamais stocké. L\'IA utilisée est Mistral AI, entreprise française dont les serveurs sont en Europe — conformité RGPD native, aucun transfert hors EU.',
               },
               {
                 q: 'Quel profil Factur-X est utilisé ?',
@@ -96,7 +104,7 @@ export default function Home() {
               },
               {
                 q: 'Que faire si ma facture est scannée ?',
-                a: 'Les PDFs issus de scan (images) ne peuvent pas être extraits automatiquement. Votre PDF doit contenir du texte sélectionnable. Pour les scans, utilisez un OCR préalable.',
+                a: 'FacturX Copilot gère les PDFs scannés automatiquement grâce à Mistral OCR. Si votre PDF est une image, l\'IA le lit quand même et extrait toutes les données. Aucun outil tiers nécessaire.',
               },
             ].map(({ q, a }) => (
               <div key={q} className="bg-white border border-slate-100 rounded-xl p-5">

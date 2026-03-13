@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractTextFromPdfBuffer, parseInvoiceWithAI } from '@/lib/pdf-extractor';
+import { extractAndParseInvoice } from '@/lib/pdf-extractor';
 import { generateFacturXXML, computeTotals, InvoiceData } from '@/lib/facturx-generator';
 import { embedFacturXInPdf } from '@/lib/pdf-embedder';
 
@@ -23,24 +23,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Fichier trop volumineux (max 10 Mo)' }, { status: 400 });
     }
 
-    // 1. Extract text from PDF
     const pdfArrayBuffer = await file.arrayBuffer();
-    const extractedText = await extractTextFromPdfBuffer(pdfArrayBuffer);
 
-    if (!extractedText || extractedText.length < 50) {
-      return NextResponse.json(
-        { error: 'Impossible d\'extraire le texte du PDF. Vérifiez que le PDF n\'est pas scanné en image.' },
-        { status: 422 }
-      );
-    }
-
-    // 2. Parse invoice data with AI
-    const parsedData = await parseInvoiceWithAI(extractedText);
+    // Auto-detect text vs scanned PDF, parse with Mistral
+    const { parsed: parsedData, method } = await extractAndParseInvoice(pdfArrayBuffer);
 
     // Validate minimum required fields
     if (!parsedData.invoiceNumber || !parsedData.invoiceDate || !parsedData.seller?.name) {
       return NextResponse.json(
-        { error: 'Données insuffisantes dans la facture. Vérifiez le numéro de facture, la date et le vendeur.' },
+        { error: 'Données insuffisantes détectées dans la facture (numéro, date ou vendeur manquant).' },
         { status: 422 }
       );
     }
@@ -54,15 +45,14 @@ export async function POST(req: NextRequest) {
 
     const invoiceData = parsedData as InvoiceData;
 
-    // 3. Generate Factur-X XML
+    // Generate Factur-X XML
     const xmlString = generateFacturXXML(invoiceData);
     const totals = computeTotals(invoiceData.lines);
 
-    // 4. Embed XML into PDF
+    // Embed XML into PDF
     const pdfBytes = new Uint8Array(pdfArrayBuffer);
     const facturXPdfBytes = await embedFacturXInPdf(pdfBytes, xmlString, invoiceData.invoiceNumber);
 
-    // 5. Return the hybrid PDF
     return new NextResponse(Buffer.from(facturXPdfBytes), {
       status: 200,
       headers: {
@@ -71,6 +61,7 @@ export async function POST(req: NextRequest) {
         'X-Invoice-Number': invoiceData.invoiceNumber,
         'X-Total-TTC': String(totals.totalTTC),
         'X-Invoice-Date': invoiceData.invoiceDate,
+        'X-Extraction-Method': method,
       },
     });
   } catch (err: unknown) {

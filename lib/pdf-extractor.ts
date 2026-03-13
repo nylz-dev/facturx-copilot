@@ -1,19 +1,27 @@
 /**
- * PDF text extractor + AI invoice parser
- * Uses pdfjs-dist for text extraction, Gemini for structured parsing
+ * PDF extractor + AI invoice parser
+ * Stack: Mistral Small (texte natif) + Mistral OCR (scans/images)
+ * 100% EU — données traitées en France, RGPD natif
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Mistral } from '@mistralai/mistralai';
 import type { InvoiceData } from './facturx-generator';
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY ?? '';
+const mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY ?? '' });
+
+// --- PDF Text Extraction (PDFs natifs) ---
 
 export async function extractTextFromPdfBuffer(buffer: ArrayBuffer): Promise<string> {
-  // Dynamic import to avoid SSR issues with pdfjs worker
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
-  const loadingTask = pdfjsLib.getDocument({ data: buffer, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
+  const loadingTask = pdfjsLib.getDocument({
+    data: buffer,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+
   const pdf = await loadingTask.promise;
   let fullText = '';
 
@@ -29,17 +37,38 @@ export async function extractTextFromPdfBuffer(buffer: ArrayBuffer): Promise<str
   return fullText.trim();
 }
 
-const EXTRACTION_PROMPT = `Tu es un expert-comptable français. Analyse ce texte extrait d'une facture PDF et retourne un JSON structuré.
+// --- OCR via Mistral OCR (PDFs scannés / images) ---
+
+export async function ocrPdfWithMistral(buffer: ArrayBuffer): Promise<string> {
+  const base64 = Buffer.from(buffer).toString('base64');
+
+  const response = await mistral.ocr.process({
+    model: 'mistral-ocr-latest',
+    document: {
+      type: 'document_url',
+      documentUrl: `data:application/pdf;base64,${base64}`,
+    },
+    includeImageBase64: false,
+  });
+
+  // Concatenate all page texts
+  const pages = response.pages ?? [];
+  return pages.map((p: { markdown?: string }) => p.markdown ?? '').join('\n').trim();
+}
+
+// --- Structured Parsing via Mistral Small ---
+
+const EXTRACTION_PROMPT = `Tu es un expert-comptable français. Analyse ce texte extrait d'une facture et retourne un JSON structuré.
 
 RÈGLES STRICTES :
 - invoiceDate et dueDate au format YYYYMMDD
 - currency = "EUR" si non précisé
-- country = "FR" si non précisé  
+- country = "FR" si non précisé
 - vatRate = parmi [0, 5.5, 10, 20]
-- Si une donnée est absente, utilise null ou une valeur vide ""
-- Retourne UNIQUEMENT le JSON, sans markdown ni explication
+- Si une donnée est absente, utilise null ou ""
+- Retourne UNIQUEMENT le JSON brut, sans markdown
 
-STRUCTURE ATTENDUE :
+STRUCTURE :
 {
   "invoiceNumber": "string",
   "invoiceDate": "YYYYMMDD",
@@ -79,21 +108,52 @@ STRUCTURE ATTENDUE :
 TEXTE DE LA FACTURE :
 `;
 
-export async function parseInvoiceWithAI(text: string): Promise<Partial<InvoiceData>> {
-  if (!GEMINI_KEY) throw new Error('GEMINI_API_KEY manquante');
+export async function parseInvoiceWithMistral(text: string): Promise<Partial<InvoiceData>> {
+  const response = await mistral.chat.complete({
+    model: 'mistral-small-latest',
+    messages: [
+      {
+        role: 'user',
+        content: EXTRACTION_PROMPT + text,
+      },
+    ],
+    temperature: 0,
+    responseFormat: { type: 'json_object' },
+  });
 
-  const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const content = response.choices?.[0]?.message?.content ?? '';
+  const text_content = typeof content === 'string' ? content : JSON.stringify(content);
 
-  const result = await model.generateContent(EXTRACTION_PROMPT + text);
-  const responseText = result.response.text().trim();
-
-  // Strip markdown code blocks if present
-  const clean = responseText
+  const clean = text_content
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim();
 
   return JSON.parse(clean) as Partial<InvoiceData>;
+}
+
+// --- Main entry: auto-detect text vs scan ---
+
+export async function extractAndParseInvoice(
+  buffer: ArrayBuffer
+): Promise<{ parsed: Partial<InvoiceData>; method: 'text' | 'ocr' }> {
+  // 1. Try native text extraction
+  let text = await extractTextFromPdfBuffer(buffer);
+  let method: 'text' | 'ocr' = 'text';
+
+  // 2. If text too short, fallback to Mistral OCR
+  if (!text || text.replace(/\s/g, '').length < 100) {
+    text = await ocrPdfWithMistral(buffer);
+    method = 'ocr';
+    if (!text || text.replace(/\s/g, '').length < 50) {
+      throw new Error(
+        'Impossible d\'extraire le contenu du PDF. Vérifiez que le fichier n\'est pas corrompu.'
+      );
+    }
+  }
+
+  // 3. Parse with Mistral Small
+  const parsed = await parseInvoiceWithMistral(text);
+  return { parsed, method };
 }
