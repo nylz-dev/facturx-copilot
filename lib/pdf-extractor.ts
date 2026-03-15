@@ -9,23 +9,36 @@ import type { InvoiceData } from './facturx-generator';
 
 const mistral = new Mistral({ apiKey: process.env.MISTRAL_API_KEY ?? '' });
 
-// --- OCR via Mistral OCR (PDFs scannés / images) ---
+// --- OCR via Mistral OCR (upload file approach — avoids 411 Content-Length issue) ---
 
 export async function ocrPdfWithMistral(buffer: ArrayBuffer): Promise<string> {
-  const base64 = Buffer.from(buffer).toString('base64');
-
-  const response = await mistral.ocr.process({
-    model: 'mistral-ocr-latest',
-    document: {
-      type: 'document_url',
-      documentUrl: `data:application/pdf;base64,${base64}`,
-    },
-    includeImageBase64: false,
+  // 1. Upload the PDF file to Mistral Files API
+  const blob = new Blob([Buffer.from(buffer)], { type: 'application/pdf' });
+  const uploadedFile = await mistral.files.upload({
+    file: { fileName: 'invoice.pdf', content: blob },
+    purpose: 'ocr',
   });
 
-  // Concatenate all page texts
-  const pages = response.pages ?? [];
-  return pages.map((p: { markdown?: string }) => p.markdown ?? '').join('\n').trim();
+  try {
+    // 2. Get a signed URL for the uploaded file
+    const signedUrlResponse = await mistral.files.getSignedUrl({ fileId: uploadedFile.id });
+
+    // 3. Run OCR using the signed URL
+    const response = await mistral.ocr.process({
+      model: 'mistral-ocr-latest',
+      document: {
+        type: 'document_url',
+        documentUrl: signedUrlResponse.url,
+      },
+      includeImageBase64: false,
+    });
+
+    const pages = response.pages ?? [];
+    return pages.map((p: { markdown?: string }) => p.markdown ?? '').join('\n').trim();
+  } finally {
+    // 4. Clean up — delete the uploaded file
+    try { await mistral.files.delete({ fileId: uploadedFile.id }); } catch { /* ignore */ }
+  }
 }
 
 // --- Structured Parsing via Mistral Small ---

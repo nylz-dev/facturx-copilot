@@ -1,6 +1,7 @@
 import UploadZone from '@/components/UploadZone';
 import Countdown from '@/components/Countdown';
 import MobileMenu from '@/components/MobileMenu';
+import CheckoutButton from '@/components/CheckoutButton';
 
 export default function Home() {
   return (
@@ -155,9 +156,9 @@ export default function Home() {
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Correction manuelle des champs</li>
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Support prioritaire</li>
               </ul>
-              <a href="#upload" className="block text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm shadow-sm">
+              <CheckoutButton plan="pro" className="block w-full text-center bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm shadow-sm cursor-pointer">
                 Démarrer l'essai →
-              </a>
+              </CheckoutButton>
             </div>
 
             {/* Business */}
@@ -172,9 +173,9 @@ export default function Home() {
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Multi-comptes clients</li>
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Onboarding dédié</li>
               </ul>
-              <a href="mailto:contact@facturexpro.fr" className="block text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 transition-colors text-sm">
-                Nous contacter
-              </a>
+              <CheckoutButton plan="cabinet" className="block w-full text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 disabled:opacity-60 transition-colors text-sm cursor-pointer">
+                S'abonner →
+              </CheckoutButton>
             </div>
 
           </div>

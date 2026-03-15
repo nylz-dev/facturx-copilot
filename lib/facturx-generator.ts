@@ -85,41 +85,61 @@ export function computeTotals(lines: InvoiceLine[]) {
     vatGroups[line.vatRate].vatAmount  += lineTVA;
   }
 
+  // Recalculate vatAmount at GROUP level (not sum of individual rounded amounts)
+  // This ensures BT-117: CalculatedAmount = round(BasisAmount × Rate / 100)
+  const finalVatGroups = Object.values(vatGroups).map(vg => ({
+    ...vg,
+    baseAmount: roundTo2(vg.baseAmount),
+    vatAmount:  roundTo2(roundTo2(vg.baseAmount) * vg.rate / 100),
+  }));
+  const finalTotalTVA = roundTo2(finalVatGroups.reduce((s, vg) => s + vg.vatAmount, 0));
+
   return {
     totalHT:   roundTo2(totalHT),
-    totalTVA:  roundTo2(totalTVA),
-    totalTTC:  roundTo2(totalHT + totalTVA),
-    vatGroups: Object.values(vatGroups),
+    totalTVA:  finalTotalTVA,
+    totalTTC:  roundTo2(totalHT + finalTotalTVA),
+    vatGroups: finalVatGroups,
   };
 }
 
 /** Build a TradeParty node in the correct XSD order:
  *  Name → SpecifiedLegalOrganization → PostalTradeAddress → SpecifiedTaxRegistration
+ *
+ *  Mandatory rules (EN16931 Schematron):
+ *  - BR-CO-26 : Seller MUST have at least one of BT-29/BT-30/BT-31
+ *  - BR-Z-02  : Zero-rated lines require seller BT-31/BT-32 (VA or legal ID)
+ *  - BR-8/BR-10/BR-11 : BOTH parties MUST have PostalTradeAddress with CountryID
  */
-function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty) {
+function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty, isSeller = false) {
+  const siret = str(party.siret);
+  const tva   = str(party.tvaNumber);
+
+  // ram:Name MUST come first in EN16931 TradePartyType XSD sequence
   parentNode.ele('ram:Name').txt(party.name);
 
-  // SpecifiedLegalOrganization (SIRET) — no schemeID, not in EN16931 codelist
-  const siret = str(party.siret);
-  if (siret) {
+  // SpecifiedLegalOrganization (BT-30 = SIRET) — AFTER Name
+  // Seller: always emit (fallback 'N/A') to satisfy BR-CO-26 + BR-Z-02
+  // Buyer: only if SIRET is available
+  if (isSeller) {
+    parentNode.ele('ram:SpecifiedLegalOrganization')
+      .ele('ram:ID').txt(siret ?? 'N/A').up();
+  } else if (siret) {
     parentNode.ele('ram:SpecifiedLegalOrganization')
       .ele('ram:ID').txt(siret).up();
   }
 
-  // PostalTradeAddress — MUST come before SpecifiedTaxRegistration per XSD
+  // PostalTradeAddress — MANDATORY for both seller and buyer (BR-8, BR-10)
+  // Always emit with at least CountryID to satisfy BR-9/BR-11
+  const addr = parentNode.ele('ram:PostalTradeAddress');
+  const zip   = str(party.postalCode);
   const line1 = str(party.addressLine1);
   const city  = str(party.city);
-  const zip   = str(party.postalCode);
-  if (line1 || city || zip) {
-    const addr = parentNode.ele('ram:PostalTradeAddress');
-    if (zip)   addr.ele('ram:PostcodeCode').txt(zip);
-    if (line1) addr.ele('ram:LineOne').txt(line1);
-    if (city)  addr.ele('ram:CityName').txt(city);
-    addr.ele('ram:CountryID').txt(str(party.country) ?? 'FR');
-  }
+  if (zip)   addr.ele('ram:PostcodeCode').txt(zip);
+  if (line1) addr.ele('ram:LineOne').txt(line1);
+  if (city)  addr.ele('ram:CityName').txt(city);
+  addr.ele('ram:CountryID').txt(str(party.country) ?? 'FR');
 
-  // SpecifiedTaxRegistration (TVA) — MUST come after PostalTradeAddress
-  const tva = str(party.tvaNumber);
+  // SpecifiedTaxRegistration (TVA = BT-31) — after PostalTradeAddress
   if (tva) {
     parentNode.ele('ram:SpecifiedTaxRegistration')
       .ele('ram:ID', { schemeID: 'VA' }).txt(tva).up();
@@ -154,7 +174,7 @@ export function generateFacturXXML(invoice: InvoiceData): string {
   // ── ExchangedDocumentContext ──────────────────────────────────────────────
   doc.ele('rsm:ExchangedDocumentContext')
     .ele('ram:GuidelineSpecifiedDocumentContextParameter')
-    .ele('ram:ID').txt('urn:factur-x.eu:1p0:basic').up();
+    .ele('ram:ID').txt('urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic').up();
 
   // ── ExchangedDocument ─────────────────────────────────────────────────────
   const exDoc = doc.ele('rsm:ExchangedDocument');
@@ -201,8 +221,8 @@ export function generateFacturXXML(invoice: InvoiceData): string {
 
   // Header Trade Agreement
   const agreement = tx.ele('ram:ApplicableHeaderTradeAgreement');
-  addTradeParty(agreement.ele('ram:SellerTradeParty'), invoice.seller);
-  addTradeParty(agreement.ele('ram:BuyerTradeParty'), invoice.buyer);
+  addTradeParty(agreement.ele('ram:SellerTradeParty'), invoice.seller, true);
+  addTradeParty(agreement.ele('ram:BuyerTradeParty'), invoice.buyer, false);
 
   // Delivery — must not be empty, add ActualDeliverySupplyChainEvent with invoice date
   tx.ele('ram:ApplicableHeaderTradeDelivery')
@@ -210,9 +230,14 @@ export function generateFacturXXML(invoice: InvoiceData): string {
     .ele('ram:OccurrenceDateTime')
     .ele('udt:DateTimeString', { format: '102' }).txt(invoiceDate).up();
 
-  // Settlement
+  // Settlement — element order is strict per EN16931 CII XSD:
+  // InvoiceCurrencyCode → SpecifiedTradeSettlementPaymentMeans → ApplicableTradeTax → ...
   const settlement = tx.ele('ram:ApplicableHeaderTradeSettlement');
 
+  // 1. Currency MUST come first
+  settlement.ele('ram:InvoiceCurrencyCode').txt(currency);
+
+  // 2. Payment means AFTER currency
   if (invoice.iban) {
     const paymentInfo = settlement.ele('ram:SpecifiedTradeSettlementPaymentMeans');
     paymentInfo.ele('ram:TypeCode').txt(invoice.paymentMeans ?? '30');
@@ -225,9 +250,7 @@ export function generateFacturXXML(invoice: InvoiceData): string {
     }
   }
 
-  settlement.ele('ram:InvoiceCurrencyCode').txt(currency);
-
-  // VAT breakdown
+  // 3. VAT breakdown
   for (const vg of vatGroups) {
     const tax = settlement.ele('ram:ApplicableTradeTax');
     tax.ele('ram:CalculatedAmount').txt(vg.vatAmount.toFixed(2));
@@ -242,15 +265,18 @@ export function generateFacturXXML(invoice: InvoiceData): string {
     .ele('ram:DueDateDateTime')
     .ele('udt:DateTimeString', { format: '102' }).txt(dueDate).up();
 
-  // Monetary summary
+  // Monetary summary — ALL values must be internally consistent (Schematron BT-106/109/112)
+  // Use COMPUTED values to ensure consistency; stated values only fix the UI display
   const summary = settlement.ele('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
-  summary.ele('ram:LineTotalAmount').txt(totalHT.toFixed(2));
-  summary.ele('ram:TaxBasisTotalAmount').txt(totalHT.toFixed(2));
+  summary.ele('ram:LineTotalAmount').txt(computed.totalHT.toFixed(2));
+  summary.ele('ram:TaxBasisTotalAmount').txt(computed.totalHT.toFixed(2)); // must = LineTotalAmount
   for (const vg of vatGroups) {
-    summary.ele('ram:TaxTotalAmount', { currencyID: currency }).txt(vg.vatAmount.toFixed(2));
+    const computedVatAmount = roundTo2(vg.baseAmount * vg.rate / 100);
+    summary.ele('ram:TaxTotalAmount', { currencyID: currency }).txt(computedVatAmount.toFixed(2));
   }
-  summary.ele('ram:GrandTotalAmount').txt(totalTTC.toFixed(2));
-  summary.ele('ram:DuePayableAmount').txt(totalTTC.toFixed(2));
+  const computedGrandTotal = roundTo2(computed.totalHT + computed.totalTVA);
+  summary.ele('ram:GrandTotalAmount').txt(computedGrandTotal.toFixed(2));
+  summary.ele('ram:DuePayableAmount').txt(computedGrandTotal.toFixed(2));
 
   return doc.end({ prettyPrint: true });
 }

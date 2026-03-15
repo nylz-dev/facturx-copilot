@@ -11,6 +11,14 @@ export async function embedFacturXInPdf(
   invoiceNumber: string
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+
+  // Remove any pre-existing embedded files (e.g. OVH already embeds Factur-X since 2024)
+  const catalog = pdfDoc.catalog;
+  const existingNames = catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
+  if (existingNames) {
+    existingNames.delete(PDFName.of('EmbeddedFiles'));
+  }
+  catalog.delete(PDFName.of('AF')); // Remove existing AF array
   const xmlBytes = Buffer.from(xmlString, 'utf-8');
 
   const now = new Date();
@@ -20,7 +28,7 @@ export async function embedFacturXInPdf(
   // ── 1. Embedded file stream ──────────────────────────────────────────────
   const embeddedFileStream = pdfDoc.context.stream(xmlBytes, {
     Type: PDFName.of('EmbeddedFile'),
-    Subtype: PDFName.of('application#2Fxml'), // application/xml encoded as PDF name
+    Subtype: PDFName.of('text#2Fxml'), // text/xml encoded as PDF name (required by Factur-X spec)
     Params: pdfDoc.context.obj({
       Size: xmlBytes.length,
       ModDate: PDFString.of(pdfDate),
@@ -43,7 +51,6 @@ export async function embedFacturXInPdf(
   const fileSpecRef = pdfDoc.context.register(fileSpecDict);
 
   // ── 3. Add to Names > EmbeddedFiles ──────────────────────────────────────
-  const catalog = pdfDoc.catalog;
 
   let namesDict = catalog.lookupMaybe(PDFName.of('Names'), PDFDict);
   if (!namesDict) {
