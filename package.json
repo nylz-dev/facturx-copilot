@@ -10,6 +10,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@mistralai/mistralai": "^1.15.1",
+    "@supabase/supabase-js": "^2.99.2",
     "@types/pdf-parse": "^1.1.5",
     "next": "^16.1.6",
     "pdf-lib": "^1.17.1",
