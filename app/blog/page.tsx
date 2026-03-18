@@ -57,7 +57,7 @@ export default async function BlogPage() {
           <p className="text-slate-400">Aucun article disponible pour le moment.</p>
         ) : (
           <div className="space-y-8">
-            {articles.map((article: Article) => (
+            {articles.map((article) => (
               <article key={article.id} className="border-b border-slate-100 pb-8 last:border-0">
                 {article.category && (
                   <span className="inline-block text-xs font-semibold text-blue-600 uppercase tracking-widest mb-2 bg-blue-50 px-2 py-0.5 rounded">
