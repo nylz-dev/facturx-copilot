@@ -19,13 +19,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractAndParseInvoice } from '@/lib/pdf-extractor';
 import { generateFacturXXML, computeTotals, InvoiceData } from '@/lib/facturx-generator';
 import { embedFacturXInPdf } from '@/lib/pdf-embedder';
+import { consumeQuota } from '@/lib/quota';
+import { getEntitlementByLicenceKey, Entitlement } from '@/lib/entitlements';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
-function verifyApiAccess(req: NextRequest): { authorized: boolean; error?: string } {
-  // 1. RapidAPI proxy secret (if configured — highest priority)
+async function verifyApiAccess(
+  req: NextRequest
+): Promise<{ authorized: boolean; error?: string; entitlement?: Entitlement }> {
+  // 1. RapidAPI proxy secret — unmetered, RapidAPI handles billing/quota on its side
   const rapidApiSecret = process.env.RAPIDAPI_PROXY_SECRET;
   if (rapidApiSecret) {
     const proxySecret = req.headers.get('x-rapidapi-proxy-secret');
@@ -34,17 +38,20 @@ function verifyApiAccess(req: NextRequest): { authorized: boolean; error?: strin
     }
   }
 
-  // 2. Direct API key auth (for users coming from facturexpro.fr directly)
+  // 2. Static API keys (for trusted server-to-server integrations)
   const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '');
   const validKeys = (process.env.API_KEYS || '').split(',').map(k => k.trim()).filter(Boolean);
-  
   if (apiKey && validKeys.includes(apiKey)) {
     return { authorized: true };
   }
 
-  // 3. If no auth is configured at all (dev mode), allow through
-  if (!rapidApiSecret && validKeys.length === 0) {
-    return { authorized: true };
+  // 3. Licence key from a Cabinet/API subscription (facturexpro.fr direct customers)
+  const licenceKey = req.headers.get('x-licence-key')?.trim();
+  if (licenceKey) {
+    const entitlement = await getEntitlementByLicenceKey(licenceKey);
+    if (entitlement) {
+      return { authorized: true, entitlement };
+    }
   }
 
   return { authorized: false, error: 'Unauthorized — invalid or missing API key.' };
@@ -53,12 +60,23 @@ function verifyApiAccess(req: NextRequest): { authorized: boolean; error?: strin
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   // Auth check
-  const auth = verifyApiAccess(req);
+  const auth = await verifyApiAccess(req);
   if (!auth.authorized) {
     return NextResponse.json(
       { error: auth.error, code: 'unauthorized' },
       { status: 401 }
     );
+  }
+
+  // Quota check — only metered plans (a subscriber with a finite limit)
+  if (auth.entitlement && auth.entitlement.limit !== Infinity) {
+    const { allowed, used } = await consumeQuota(`licence:${req.headers.get('x-licence-key')}`, auth.entitlement.limit);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Monthly quota exceeded for this subscription.', code: 'quota_exceeded', used, limit: auth.entitlement.limit },
+        { status: 402 }
+      );
+    }
   }
 
   try {

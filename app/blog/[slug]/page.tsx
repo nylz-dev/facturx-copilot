@@ -47,7 +47,7 @@ export default async function ArticlePage({ params }: Props) {
   return (
     <div className="min-h-screen bg-white text-slate-900">
       <div className="bg-orange-500 text-white text-sm font-semibold text-center py-2 px-4">
-        Obligation legale : 1er septembre 2026 pour toutes les PME françaises
+        Réception Factur-X obligatoire depuis le 1er septembre 2026 — émission pour les PME/TPE dès 2027
       </div>
 
       <header className="border-b border-slate-100 bg-white sticky top-0 z-10 shadow-sm">

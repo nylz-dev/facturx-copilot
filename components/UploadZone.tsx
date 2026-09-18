@@ -31,8 +31,12 @@ export default function UploadZone() {
   const [errorMsg, setErrorMsg] = useState('');
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<'single' | 'pro' | null>(null);
+  const [licenceKey, setLicenceKey] = useState<string | null>(null);
+  const [licenceInput, setLicenceInput] = useState('');
+  const [showLicenceForm, setShowLicenceForm] = useState(false);
 
-  // On mount: check for ?token= in URL (redirect back from Stripe 1€)
+  // On mount: check for ?token= in URL (redirect back from Stripe 1€),
+  // and restore a previously saved licence key (Pro/Cabinet subscribers)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -43,7 +47,36 @@ export default function UploadZone() {
       url.searchParams.delete('token');
       window.history.replaceState({}, '', url.toString());
     }
+
+    try {
+      const saved = window.localStorage.getItem('facturx_licence_key');
+      if (saved) setLicenceKey(saved);
+    } catch {
+      // localStorage unavailable (private browsing) — licence key input still works per-session
+    }
   }, []);
+
+  const saveLicenceKey = () => {
+    const trimmed = licenceInput.trim();
+    if (!trimmed) return;
+    setLicenceKey(trimmed);
+    setShowLicenceForm(false);
+    try {
+      window.localStorage.setItem('facturx_licence_key', trimmed);
+    } catch {
+      // ignore — key stays active for this session only
+    }
+  };
+
+  const clearLicenceKey = () => {
+    setLicenceKey(null);
+    setLicenceInput('');
+    try {
+      window.localStorage.removeItem('facturx_licence_key');
+    } catch {
+      // ignore
+    }
+  };
 
   const handleCheckout = async (plan: 'single' | 'pro' | 'cabinet') => {
     const isSingle = plan === 'single';
@@ -89,7 +122,11 @@ export default function UploadZone() {
 
       try {
         setStep('extracting');
-        const res = await fetch('/api/convert', { method: 'POST', body: formData });
+        const res = await fetch('/api/convert', {
+          method: 'POST',
+          body: formData,
+          headers: licenceKey ? { 'x-licence-key': licenceKey } : undefined,
+        });
 
         if (res.status === 402) {
           const data = await res.json();
@@ -165,6 +202,47 @@ export default function UploadZone() {
             <p className="font-semibold text-green-800">Token de conversion actif</p>
             <p className="text-green-600 text-xs">Déposez votre PDF — cette conversion est débloquée.</p>
           </div>
+        </div>
+      )}
+
+      {/* Licence key (Pro / Cabinet subscribers) */}
+      {step === 'idle' && !activeToken && (
+        <div className="mb-4">
+          {licenceKey ? (
+            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm">
+              <span className="text-2xl">🔑</span>
+              <div className="flex-1">
+                <p className="font-semibold text-blue-800">Clé de licence active</p>
+                <p className="text-blue-600 text-xs font-mono truncate">{licenceKey}</p>
+              </div>
+              <button onClick={clearLicenceKey} className="text-xs text-blue-500 hover:text-blue-700 shrink-0">
+                Retirer
+              </button>
+            </div>
+          ) : showLicenceForm ? (
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <input
+                type="text"
+                value={licenceInput}
+                onChange={(e) => setLicenceInput(e.target.value)}
+                placeholder="Collez votre clé de licence (abonné Pro / Cabinet)"
+                className="flex-1 bg-transparent text-sm px-1 py-1 focus:outline-none"
+              />
+              <button onClick={saveLicenceKey} className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">
+                Valider
+              </button>
+              <button onClick={() => setShowLicenceForm(false)} className="text-xs text-slate-400 hover:text-slate-600 shrink-0">
+                Annuler
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLicenceForm(true)}
+              className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
+            >
+              Déjà abonné Pro / Cabinet ? Entrez votre clé de licence →
+            </button>
+          )}
         </div>
       )}
 

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractAndParseInvoice } from '@/lib/pdf-extractor';
 import { generateFacturXXML, computeTotals, InvoiceData } from '@/lib/facturx-generator';
 import { embedFacturXInPdf } from '@/lib/pdf-embedder';
-import { isQuotaExceeded, incrementUsage, getUsage, FREE_LIMIT } from '@/lib/quota';
+import { consumeQuota, FREE_LIMIT } from '@/lib/quota';
 import { verifyAndConsumeToken } from '@/lib/tokens';
+import { getEntitlementByLicenceKey } from '@/lib/entitlements';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -13,14 +14,31 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('pdf') as File | null;
     const token = (formData.get('token') as string | null)?.trim() || null;
+    const licenceKey = req.headers.get('x-licence-key')?.trim() || null;
 
-    // ── Quota / Token gate ──────────────────────────────────────────────────
+    // ── Quota / Token / Subscriber gate ─────────────────────────────────────
     const ip =
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       req.headers.get('x-real-ip') ||
       '127.0.0.1';
 
-    if (token) {
+    let remaining: number | null = null;
+
+    const entitlement = licenceKey ? await getEntitlementByLicenceKey(licenceKey) : null;
+
+    if (entitlement) {
+      // Paying subscriber — quota scoped to their licence, per plan limit
+      if (entitlement.limit !== Infinity) {
+        const { allowed, used } = await consumeQuota(`licence:${licenceKey}`, entitlement.limit);
+        if (!allowed) {
+          return NextResponse.json(
+            { error: 'Quota mensuel atteint pour votre abonnement.', code: 'quota_exceeded', used, limit: entitlement.limit },
+            { status: 402 }
+          );
+        }
+        remaining = entitlement.limit - used;
+      }
+    } else if (token) {
       // 1€ single-use token path
       const secretKey = process.env.STRIPE_SECRET_KEY;
       if (!secretKey) {
@@ -34,19 +52,15 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-      // Free quota path
-      if (isQuotaExceeded(ip)) {
-        const used = getUsage(ip);
+      // Free quota path — atomic check-and-increment, keyed by IP
+      const { allowed, used } = await consumeQuota(`ip:${ip}`, FREE_LIMIT);
+      if (!allowed) {
         return NextResponse.json(
-          {
-            error: 'Quota gratuit atteint.',
-            code: 'quota_exceeded',
-            used,
-            limit: FREE_LIMIT,
-          },
+          { error: 'Quota gratuit atteint.', code: 'quota_exceeded', used, limit: FREE_LIMIT },
           { status: 402 }
         );
       }
+      remaining = FREE_LIMIT - used;
     }
     // ──────────────────────────────────────────────────────────────────────
 
@@ -106,13 +120,6 @@ export async function POST(req: NextRequest) {
     // Embed XML into PDF
     const pdfBytes = new Uint8Array(pdfArrayBuffer);
     const facturXPdfBytes = await embedFacturXInPdf(pdfBytes, xmlString, invoiceData.invoiceNumber);
-
-    // Increment quota only for free path (token path is already paid)
-    if (!token) {
-      incrementUsage(ip);
-    }
-
-    const remaining = token ? null : FREE_LIMIT - getUsage(ip);
 
     return new NextResponse(Buffer.from(facturXPdfBytes), {
       status: 200,

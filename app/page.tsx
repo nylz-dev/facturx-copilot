@@ -9,7 +9,7 @@ export default function Home() {
 
       {/* ─── Top urgency banner ─── */}
       <div className="bg-orange-500 text-white text-sm font-semibold text-center py-2 px-4">
-        ⚠️ Obligation légale : 1er septembre 2026 — <Countdown /> avant la mise en conformité obligatoire
+        ⚠️ Réception obligatoire depuis le 1ᵉʳ septembre 2026 — émission obligatoire pour les PME/TPE dans <Countdown /> (1ᵉʳ septembre 2027)
       </div>
 
       {/* ─── Header ─── */}
@@ -54,14 +54,14 @@ export default function Home() {
             <span className="text-blue-600">Factur-X en 30 secondes</span>
           </h1>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-8">
-            À partir du <strong className="text-slate-700">1er septembre 2026</strong>, toutes les PME françaises devront émettre des factures au format hybride Factur-X.{' '}
+            Depuis le <strong className="text-slate-700">1er septembre 2026</strong>, toutes les entreprises françaises doivent pouvoir recevoir des factures au format hybride Factur-X — et à partir du <strong className="text-slate-700">1er septembre 2027</strong>, les PME et TPE devront aussi les émettre.{' '}
             <strong className="text-slate-700">4 millions d'entreprises ne sont pas encore prêtes.</strong> Soyez conforme maintenant.
           </p>
 
           {/* Trust indicators */}
           <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-400 font-medium mb-12">
             <span>✅ PDFs natifs & scannés</span>
-            <span>✅ Profil BASIC conforme PPF/PDP</span>
+            <span>✅ Profil BASIC conforme EN16931</span>
             <span>✅ Aucun stockage de vos données</span>
             <span>✅ Résultat immédiat</span>
           </div>
@@ -100,7 +100,7 @@ export default function Home() {
                 icon: '✅',
                 step: '03',
                 title: 'Téléchargez le Factur-X',
-                desc: 'PDF hybride avec XML Factur-X intégré, conforme PPF/PDP. Prêt à envoyer à vos clients ou votre expert-comptable.',
+                desc: 'PDF hybride avec XML Factur-X intégré, conforme EN16931. Prêt à envoyer à vos clients ou votre expert-comptable.',
               },
             ].map((s) => (
               <div key={s.step} className="bg-white rounded-2xl p-7 border border-slate-100 shadow-sm">
@@ -141,12 +141,9 @@ export default function Home() {
               </a>
             </div>
 
-            {/* Pro — highlighted */}
-            <div className="rounded-2xl border-2 border-blue-600 p-7 relative shadow-lg">
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                LE PLUS POPULAIRE
-              </span>
-              <p className="text-sm font-semibold text-blue-600 mb-1">Pro</p>
+            {/* Pro */}
+            <div className="rounded-2xl border border-slate-200 p-7">
+              <p className="text-sm font-semibold text-slate-500 mb-1">Pro</p>
               <p className="text-4xl font-extrabold text-slate-900 mb-1">19€<span className="text-lg font-medium text-slate-400">/mois</span></p>
               <p className="text-xs text-slate-400 mb-6">Pour les PME et indépendants</p>
               <ul className="text-sm text-slate-600 space-y-2.5 mb-8">
@@ -156,14 +153,17 @@ export default function Home() {
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Correction manuelle des champs</li>
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Support prioritaire</li>
               </ul>
-              <CheckoutButton plan="pro" className="block w-full text-center bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm shadow-sm cursor-pointer">
+              <CheckoutButton plan="pro" className="block w-full text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 disabled:opacity-60 transition-colors text-sm cursor-pointer">
                 Démarrer l'essai →
               </CheckoutButton>
             </div>
 
-            {/* Business */}
-            <div className="rounded-2xl border border-slate-200 p-7">
-              <p className="text-sm font-semibold text-slate-500 mb-1">Cabinet / API</p>
+            {/* Cabinet / API — highlighted */}
+            <div className="rounded-2xl border-2 border-blue-600 p-7 relative shadow-lg">
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                RECOMMANDÉ EXPERTS-COMPTABLES
+              </span>
+              <p className="text-sm font-semibold text-blue-600 mb-1">Cabinet / API</p>
               <p className="text-4xl font-extrabold text-slate-900 mb-1">49€<span className="text-lg font-medium text-slate-400">/mois</span></p>
               <p className="text-xs text-slate-400 mb-6">Pour les experts-comptables & éditeurs</p>
               <ul className="text-sm text-slate-600 space-y-2.5 mb-8">
@@ -173,7 +173,7 @@ export default function Home() {
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Multi-comptes clients</li>
                 <li className="flex gap-2"><span className="text-green-500 font-bold">✓</span> Onboarding dédié</li>
               </ul>
-              <CheckoutButton plan="cabinet" className="block w-full text-center border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:border-slate-400 disabled:opacity-60 transition-colors text-sm cursor-pointer">
+              <CheckoutButton plan="cabinet" className="block w-full text-center bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm shadow-sm cursor-pointer">
                 S'abonner →
               </CheckoutButton>
             </div>
@@ -190,7 +190,7 @@ export default function Home() {
             {[
               {
                 q: "Qu'est-ce que Factur-X ?",
-                a: "Factur-X est un standard de facturation électronique hybride : un PDF lisible par l'humain avec un fichier XML structuré intégré, lisible par les logiciels comptables et les plateformes d'État (PPF/PDP).",
+                a: "Factur-X est un standard de facturation électronique hybride : un PDF lisible par l'humain avec un fichier XML structuré intégré, lisible par les logiciels comptables et compatible avec les plateformes de dématérialisation (PDP) de la réforme 2026-2027.",
               },
               {
                 q: 'Mes données sont-elles sécurisées ?',
@@ -198,7 +198,7 @@ export default function Home() {
               },
               {
                 q: 'Mon ERP est-il compatible ?',
-                a: "Le profil BASIC généré est compatible avec tous les ERP du marché (Sage, Cegid, EBP, Pennylane, etc.) et les plateformes PDP/PPF de l'État.",
+                a: "Le profil BASIC généré est compatible avec tous les ERP du marché (Sage, Cegid, EBP, Pennylane, etc.). FacturXPro convertit vos factures au format Factur-X — ce n'est pas une plateforme de dématérialisation (PDP) : vous transmettez ensuite le fichier via votre PDP ou votre expert-comptable.",
               },
               {
                 q: 'Que faire si ma facture est scannée ?',

@@ -5,6 +5,32 @@
 
 import { PDFDocument, PDFName, PDFString, PDFArray, PDFDict } from 'pdf-lib';
 
+// Compact sRGB IEC61966-2.1 ICC v2 profile (410 bytes), the minimal
+// output-intent profile PDF/A-3b requires (ISO 19005-3 §6.2.3). Source:
+// https://github.com/saucecontrol/Compact-ICC-Profiles (public-domain
+// colour data, purpose-built for embedding).
+const SRGB_ICC_PROFILE_BASE64 =
+  'AAABmmxjbXMCEAAAbW50clJHQiBYWVogB+IAAwAUAAkADgAdYWNzcE1TRlQAAAAAc2F3c2N0cmwAAAAAAAAAAAAAAAAAAPbWAAEAAAAA0y1oYW5k63cfPKpTUQLpPihskUauVwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJZGVzYwAAAPAAAABfd3RwdAAAAQwAAAAUclhZWgAAASAAAAAUZ1hZWgAAATQAAAAUYlhZWgAAAUgAAAAUclRSQwAAAVwAAAA0Z1RSQwAAAVwAAAA0YlRSQwAAAVwAAAA0Y3BydAAAAZAAAAAKZGVzYwAAAAAAAAAFblJHQgAAAAAAAAAAAAAAAFhZWiAAAAAAAADzVAABAAAAARbJWFlaIAAAAAAAAG+gAAA48gAAA49YWVogAAAAAAAAYpYAALeJAAAY2lhZWiAAAAAAAAAkoAAAD4UAALbEY3VydgAAAAAAAAAUAAABBwK1BWsJNg5QFLEcgCXIMKE9GUtAWyds24BrleOtUMbC4jH//3RleHQAAAAAMAA=';
+
+function buildOutputIntent(pdfDoc: PDFDocument) {
+  const iccBytes = Buffer.from(SRGB_ICC_PROFILE_BASE64, 'base64');
+  const iccStream = pdfDoc.context.stream(iccBytes, {
+    N: 3,
+    Alternate: PDFName.of('DeviceRGB'),
+  });
+  const iccStreamRef = pdfDoc.context.register(iccStream);
+
+  const outputIntentDict = pdfDoc.context.obj({
+    Type: PDFName.of('OutputIntent'),
+    S: PDFName.of('GTS_PDFA1'),
+    OutputConditionIdentifier: PDFString.of('sRGB IEC61966-2.1'),
+    Info: PDFString.of('sRGB IEC61966-2.1'),
+    DestOutputProfile: iccStreamRef,
+  });
+
+  return pdfDoc.context.register(outputIntentDict);
+}
+
 export async function embedFacturXInPdf(
   pdfBytes: Uint8Array,
   xmlString: string,
@@ -68,6 +94,10 @@ export async function embedFacturXInPdf(
   // ── 4. AF array (Associated Files — PDF/A-3 required) ────────────────────
   const afArray = pdfDoc.context.obj([fileSpecRef]);
   catalog.set(PDFName.of('AF'), afArray);
+
+  // ── 4b. OutputIntent (PDF/A-3b mandatory — ISO 19005-3 §6.2.3) ────────────
+  const outputIntentRef = buildOutputIntent(pdfDoc);
+  catalog.set(PDFName.of('OutputIntents'), pdfDoc.context.obj([outputIntentRef]));
 
   // ── 5. XMP Metadata (PDF/A-3b + Factur-X) ────────────────────────────────
   // The fx: namespace MUST be declared as a PDF/A extension schema (ISO 19005-3 clause 6.2.3)
