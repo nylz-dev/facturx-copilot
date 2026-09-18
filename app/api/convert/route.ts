@@ -119,7 +119,11 @@ export async function POST(req: NextRequest) {
 
     // Embed XML into PDF
     const pdfBytes = new Uint8Array(pdfArrayBuffer);
-    const facturXPdfBytes = await embedFacturXInPdf(pdfBytes, xmlString, invoiceData.invoiceNumber);
+    const { pdfBytes: facturXPdfBytes, nonEmbeddedFonts } = await embedFacturXInPdf(
+      pdfBytes,
+      xmlString,
+      invoiceData.invoiceNumber
+    );
 
     return new NextResponse(Buffer.from(facturXPdfBytes), {
       status: 200,
@@ -131,6 +135,9 @@ export async function POST(req: NextRequest) {
         'X-Invoice-Date': invoiceData.invoiceDate,
         'X-Extraction-Method': method,
         ...(remaining !== null ? { 'X-Free-Remaining': String(remaining) } : {}),
+        ...(nonEmbeddedFonts.length > 0
+          ? { 'X-PDFA-Font-Warning': nonEmbeddedFonts.join(', ') }
+          : {}),
       },
     });
   } catch (err: unknown) {

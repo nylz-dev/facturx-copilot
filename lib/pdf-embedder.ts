@@ -3,7 +3,8 @@
  * Crée un PDF/A-3b hybride conforme Factur-X 1.0 BASIC
  */
 
-import { PDFDocument, PDFName, PDFString, PDFArray, PDFDict } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFString, PDFHexString, PDFArray, PDFDict } from 'pdf-lib';
+import { createHash } from 'crypto';
 
 // Compact sRGB IEC61966-2.1 ICC v2 profile (410 bytes), the minimal
 // output-intent profile PDF/A-3b requires (ISO 19005-3 §6.2.3). Source:
@@ -31,11 +32,66 @@ function buildOutputIntent(pdfDoc: PDFDocument) {
   return pdfDoc.context.register(outputIntentDict);
 }
 
+/**
+ * Names of fonts used by the source PDF whose programs aren't embedded.
+ * PDF/A-3 requires every rendered font to be embedded, and we can't add a
+ * font program we don't have — so the caller warns instead of silently
+ * handing back a file that fails validation.
+ */
+function findNonEmbeddedFonts(pdfDoc: PDFDocument): string[] {
+  const missing = new Set<string>();
+
+  const isEmbedded = (descriptor: PDFDict | undefined): boolean =>
+    !!descriptor &&
+    (!!descriptor.get(PDFName.of('FontFile')) ||
+      !!descriptor.get(PDFName.of('FontFile2')) ||
+      !!descriptor.get(PDFName.of('FontFile3')));
+
+  const inspect = (fontDict: PDFDict) => {
+    const subtype = fontDict.get(PDFName.of('Subtype'))?.toString();
+
+    // Type3 fonts carry their glyphs as content streams — nothing to embed.
+    if (subtype === '/Type3') return;
+
+    let target = fontDict;
+    if (subtype === '/Type0') {
+      const descendants = fontDict.lookupMaybe(PDFName.of('DescendantFonts'), PDFArray);
+      const descendant = descendants && pdfDoc.context.lookupMaybe(descendants.get(0), PDFDict);
+      if (!descendant) return;
+      target = descendant;
+    }
+
+    const descriptor = target.lookupMaybe(PDFName.of('FontDescriptor'), PDFDict);
+    if (!isEmbedded(descriptor)) {
+      const baseFont = target.get(PDFName.of('BaseFont'))?.toString() ?? '(inconnue)';
+      missing.add(baseFont.replace(/^\//, ''));
+    }
+  };
+
+  for (const page of pdfDoc.getPages()) {
+    const resources = page.node.Resources();
+    const fonts = resources?.lookupMaybe(PDFName.of('Font'), PDFDict);
+    if (!fonts) continue;
+    for (const key of fonts.keys()) {
+      const fontDict = fonts.lookupMaybe(key, PDFDict);
+      if (fontDict) inspect(fontDict);
+    }
+  }
+
+  return [...missing];
+}
+
+export interface FacturXPdfResult {
+  pdfBytes: Uint8Array;
+  /** Fonts in the source PDF that aren't embedded — each one breaks PDF/A-3. */
+  nonEmbeddedFonts: string[];
+}
+
 export async function embedFacturXInPdf(
   pdfBytes: Uint8Array,
   xmlString: string,
   invoiceNumber: string
-): Promise<Uint8Array> {
+): Promise<FacturXPdfResult> {
   const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
   // Remove any pre-existing embedded files (e.g. OVH already embeds Factur-X since 2024)
@@ -183,5 +239,14 @@ export async function embedFacturXInPdf(
   const metadataRef = pdfDoc.context.register(metadataStream);
   catalog.set(PDFName.of('Metadata'), metadataRef);
 
-  return pdfDoc.save();
+  // ── 6. Trailer file identifier (PDF/A mandatory — ISO 19005-3 §6.1.3) ─────
+  // pdf-lib does not emit /ID on its own, and veraPDF rejects the file
+  // without it.
+  const fileId = createHash('md5').update(`${invoiceNumber}:${isoDate}`).digest('hex').toUpperCase();
+  const idString = PDFHexString.of(fileId);
+  pdfDoc.context.trailerInfo.ID = pdfDoc.context.obj([idString, idString]);
+
+  const nonEmbeddedFonts = findNonEmbeddedFonts(pdfDoc);
+
+  return { pdfBytes: await pdfDoc.save(), nonEmbeddedFonts };
 }

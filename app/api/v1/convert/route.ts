@@ -196,7 +196,11 @@ export async function POST(req: NextRequest) {
 
     // ── PDF output (default) ────────────────────────────────────────────────
     const pdfBytes = new Uint8Array(pdfArrayBuffer);
-    const facturXPdfBytes = await embedFacturXInPdf(pdfBytes, xmlString, invoiceData.invoiceNumber);
+    const { pdfBytes: facturXPdfBytes, nonEmbeddedFonts } = await embedFacturXInPdf(
+      pdfBytes,
+      xmlString,
+      invoiceData.invoiceNumber
+    );
 
     return new NextResponse(Buffer.from(facturXPdfBytes), {
       status: 200,
@@ -208,6 +212,9 @@ export async function POST(req: NextRequest) {
         'X-Invoice-Date': invoiceData.invoiceDate,
         'X-Extraction-Method': method,
         'X-Facturx-Profile': 'BASIC',
+        ...(nonEmbeddedFonts.length > 0
+          ? { 'X-PDFA-Font-Warning': nonEmbeddedFonts.join(', ') }
+          : {}),
       },
     });
   } catch (err: unknown) {
