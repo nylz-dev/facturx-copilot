@@ -2,6 +2,7 @@ import { supabaseBlog } from '@/lib/supabase-blog';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 
 export const revalidate = 3600;
 
@@ -12,16 +13,35 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data } = await supabaseBlog
     .from('articles')
-    .select('title, excerpt')
+    .select('title, excerpt, published_at')
     .eq('slug', params.slug)
     .eq('site_id', 'facturexpro')
     .single();
 
   if (!data) return { title: 'Article introuvable' };
 
+  const url = `${SITE_URL}/blog/${params.slug}`;
+
   return {
-    title: `${data.title} — FacturXPro`,
+    title: `${data.title} — ${SITE_NAME}`,
     description: data.excerpt,
+    alternates: { canonical: url },
+    openGraph: {
+      title: data.title,
+      description: data.excerpt ?? undefined,
+      url,
+      siteName: SITE_NAME,
+      locale: 'fr_FR',
+      type: 'article',
+      publishedTime: data.published_at ?? undefined,
+      images: [{ url: `${SITE_URL}/og-image.png`, width: 1200, height: 630, alt: data.title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: data.title,
+      description: data.excerpt ?? undefined,
+      images: [`${SITE_URL}/og-image.png`],
+    },
   };
 }
 
@@ -44,8 +64,43 @@ export default async function ArticlePage({ params }: Props) {
 
   if (!article) notFound();
 
+  const url = `${SITE_URL}/blog/${params.slug}`;
+  const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: article.title,
+    description: article.excerpt ?? undefined,
+    datePublished: article.published_at ?? undefined,
+    dateModified: article.published_at ?? undefined,
+    author: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+    publisher: {
+      '@type': 'Organization',
+      name: SITE_NAME,
+      logo: { '@type': 'ImageObject', url: `${SITE_URL}/og-image.png` },
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    inLanguage: 'fr',
+  };
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Accueil', item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
+      { '@type': 'ListItem', position: 3, name: article.title, item: url },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-white text-slate-900">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       <div className="bg-orange-500 text-white text-sm font-semibold text-center py-2 px-4">
         Réception Factur-X obligatoire depuis le 1er septembre 2026 — émission pour les PME/TPE dès 2027
       </div>

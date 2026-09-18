@@ -2,10 +2,44 @@ import UploadZone from '@/components/UploadZone';
 import Countdown from '@/components/Countdown';
 import MobileMenu from '@/components/MobileMenu';
 import CheckoutButton from '@/components/CheckoutButton';
+import { FAQ, SITE_URL } from '@/lib/site';
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQ.map(({ q, a }) => ({
+    '@type': 'Question',
+    name: q,
+    acceptedAnswer: { '@type': 'Answer', text: a },
+  })),
+};
+
+const howToSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'Convertir une facture PDF en Factur-X',
+  description:
+    'Transformer une facture PDF existante en fichier Factur-X hybride (PDF/A-3 avec XML EN16931 intégré).',
+  totalTime: 'PT30S',
+  inLanguage: 'fr',
+  step: [
+    { '@type': 'HowToStep', position: 1, name: 'Déposez votre PDF', text: "Glissez-déposez votre facture existante, native ou scannée.", url: `${SITE_URL}/#upload` },
+    { '@type': 'HowToStep', position: 2, name: "L'IA extrait les données", text: 'Mistral AI analyse la facture et extrait vendeur, acheteur, lignes, TVA et IBAN.' },
+    { '@type': 'HowToStep', position: 3, name: 'Téléchargez le Factur-X', text: 'Vous récupérez un PDF/A-3 avec le XML Factur-X intégré, conforme EN16931.' },
+  ],
+};
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
 
       {/* ─── Top urgency banner ─── */}
       <div className="bg-orange-500 text-white text-sm font-semibold text-center py-2 px-4">
@@ -39,7 +73,7 @@ export default function Home() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex flex-wrap justify-center gap-3 mb-8">
             <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-100">
-              🇫🇷 Réforme facturation électronique 2026
+              🇫🇷 Réforme facturation électronique 2026-2027
             </span>
             <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-green-100">
               🔒 RGPD natif — données traitées en France
@@ -62,8 +96,8 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-400 font-medium mb-12">
             <span>✅ PDFs natifs & scannés</span>
             <span>✅ Profil BASIC conforme EN16931</span>
+            <span>✅ PDF/A-3b validé veraPDF</span>
             <span>✅ Aucun stockage de vos données</span>
-            <span>✅ Résultat immédiat</span>
           </div>
         </div>
       </section>
@@ -187,28 +221,7 @@ export default function Home() {
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-extrabold text-slate-900 mb-10 text-center">Questions fréquentes</h2>
           <div className="space-y-4">
-            {[
-              {
-                q: "Qu'est-ce que Factur-X ?",
-                a: "Factur-X est un standard de facturation électronique hybride : un PDF lisible par l'humain avec un fichier XML structuré intégré, lisible par les logiciels comptables et compatible avec les plateformes de dématérialisation (PDP) de la réforme 2026-2027.",
-              },
-              {
-                q: 'Mes données sont-elles sécurisées ?',
-                a: "Le traitement est 100% éphémère : votre PDF est analysé en mémoire et jamais stocké. L'IA utilisée est Mistral AI, entreprise française dont les serveurs sont en Europe — conformité RGPD native, aucun transfert hors UE.",
-              },
-              {
-                q: 'Mon ERP est-il compatible ?',
-                a: "Le profil BASIC généré est compatible avec tous les ERP du marché (Sage, Cegid, EBP, Pennylane, etc.). FacturXPro convertit vos factures au format Factur-X — ce n'est pas une plateforme de dématérialisation (PDP) : vous transmettez ensuite le fichier via votre PDP ou votre expert-comptable.",
-              },
-              {
-                q: 'Que faire si ma facture est scannée ?',
-                a: "FacturX Pro gère les PDFs scannés automatiquement grâce à Mistral OCR. Si votre PDF est une image, l'IA le lit quand même et extrait toutes les données. Aucun outil tiers nécessaire.",
-              },
-              {
-                q: 'Puis-je corriger les données extraites ?',
-                a: "Oui, sur les plans Pro et Cabinet, vous pouvez vérifier et corriger chaque champ extrait avant de générer le fichier final.",
-              },
-            ].map(({ q, a }) => (
+            {FAQ.map(({ q, a }) => (
               <div key={q} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm">
                 <p className="font-semibold text-slate-800 mb-1.5">{q}</p>
                 <p className="text-sm text-slate-500 leading-relaxed">{a}</p>
