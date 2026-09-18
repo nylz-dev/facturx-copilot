@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractAndParseInvoice } from '@/lib/pdf-extractor';
-import { generateFacturXXML, computeTotals, InvoiceData } from '@/lib/facturx-generator';
+import { generateFacturXXML, computeTotals, findConformanceGaps, InvoiceData } from '@/lib/facturx-generator';
 import { embedFacturXInPdf } from '@/lib/pdf-embedder';
 import { consumeQuota, FREE_LIMIT } from '@/lib/quota';
 import { verifyAndConsumeToken } from '@/lib/tokens';
@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
 
     // Generate Factur-X XML
     const xmlString = generateFacturXXML(invoiceData);
+    const conformanceGaps = findConformanceGaps(invoiceData);
     const recomputedTotals = computeTotals(invoiceData.lines);
     const displayTTC = invoiceData.statedTotalTTC ?? recomputedTotals.totalTTC;
 
@@ -137,6 +138,9 @@ export async function POST(req: NextRequest) {
         ...(remaining !== null ? { 'X-Free-Remaining': String(remaining) } : {}),
         ...(nonEmbeddedFonts.length > 0
           ? { 'X-PDFA-Font-Warning': nonEmbeddedFonts.join(', ') }
+          : {}),
+        ...(conformanceGaps.length > 0
+          ? { 'X-Facturx-Data-Warning': conformanceGaps.join(' ; ') }
           : {}),
       },
     });

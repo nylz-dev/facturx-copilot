@@ -9,6 +9,7 @@ interface UploadResult {
   blobUrl: string;
   freeRemaining: number | null;
   fontWarning: string | null;
+  dataWarning: string | null;
 }
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'generating' | 'done' | 'error' | 'quota_exceeded';
@@ -158,20 +159,21 @@ export default function UploadZone() {
         const freeRemainingRaw = res.headers.get('X-Free-Remaining');
         const freeRemaining = freeRemainingRaw !== null ? parseInt(freeRemainingRaw, 10) : null;
         const fontWarning = res.headers.get('X-PDFA-Font-Warning');
+        const dataWarning = res.headers.get('X-Facturx-Data-Warning');
 
         // Clear token after successful single use
         if (token) {
           setActiveToken(null);
         }
 
-        setResult({ fileName: `facturx_${invoiceNumber}.pdf`, invoiceNumber, totalTTC, blobUrl, freeRemaining, fontWarning });
+        setResult({ fileName: `facturx_${invoiceNumber}.pdf`, invoiceNumber, totalTTC, blobUrl, freeRemaining, fontWarning, dataWarning });
         setStep('done');
       } catch (err: unknown) {
         setErrorMsg(err instanceof Error ? err.message : 'Erreur inconnue');
         setStep('error');
       }
     },
-    []
+    [licenceKey]
   );
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -345,15 +347,28 @@ export default function UploadZone() {
             )}
           </div>
 
-          {result.fontWarning && (
-            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
-              <p className="font-semibold text-amber-800 mb-1">⚠️ Polices non embarquées dans votre PDF source</p>
-              <p className="text-amber-700 text-xs leading-relaxed">
-                Le XML Factur-X est correct et exploitable, mais la norme PDF/A-3 exige que toutes les polices
-                soient embarquées — ce n'est pas le cas de : <span className="font-mono">{result.fontWarning}</span>.
-                Pour un fichier 100% conforme, réexportez votre facture en cochant « incorporer les polices »
-                (ou en PDF/A) depuis votre logiciel, puis reconvertissez.
-              </p>
+          {(result.fontWarning || result.dataWarning) && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-3">
+              {result.dataWarning && (
+                <div>
+                  <p className="font-semibold text-amber-800 mb-1">⚠️ Données manquantes sur la facture</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    {result.dataWarning}. Le XML est généré, mais il sera refusé par les contrôles EN16931 :
+                    complétez la facture source puis reconvertissez.
+                  </p>
+                </div>
+              )}
+              {result.fontWarning && (
+                <div>
+                  <p className="font-semibold text-amber-800 mb-1">⚠️ Polices non embarquées dans votre PDF source</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    Le XML Factur-X est correct et exploitable, mais la norme PDF/A-3 exige que toutes les polices
+                    soient embarquées — ce n'est pas le cas de : <span className="font-mono">{result.fontWarning}</span>.
+                    Pour un fichier 100% conforme, réexportez votre facture en cochant « incorporer les polices »
+                    (ou en PDF/A) depuis votre logiciel, puis reconvertissez.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
