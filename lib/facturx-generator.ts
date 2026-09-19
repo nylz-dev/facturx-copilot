@@ -13,6 +13,7 @@ export interface InvoiceParty {
   name: string;
   siret?: string;
   tvaNumber?: string;
+  email?: string;     // BT-34 / BT-49 : adresse électronique
   addressLine1?: string;
   city?: string;
   postalCode?: string;
@@ -36,6 +37,11 @@ export interface InvoiceData {
   buyer: InvoiceParty;
   lines: InvoiceLine[];
   notes?: string;
+  // Mentions obligatoires sur une facture française (art. L441-9 et L441-10
+  // du code de commerce), reprises telles qu'imprimées sur la facture source.
+  latePaymentPenalties?: string;   // PMD : pénalités de retard
+  recoveryFee?: string;            // PMT : indemnité forfaitaire de recouvrement
+  earlyPaymentDiscount?: string;   // AAB : escompte
   paymentMeans?: string;       // ex: "30" = virement, "31" = prélèvement
   iban?: string;
   bic?: string;
@@ -147,6 +153,14 @@ function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty, isSeller = f
   if (city)  addr.ele('ram:CityName').txt(city);
   addr.ele('ram:CountryID').txt(str(party.country) ?? 'FR');
 
+  // Adresse électronique (BT-34 vendeur / BT-49 acheteur) — entre
+  // PostalTradeAddress et SpecifiedTaxRegistration dans l'ordre XSD.
+  const email = str(party.email);
+  if (email) {
+    parentNode.ele('ram:URIUniversalCommunication')
+      .ele('ram:URIID', { schemeID: 'EM' }).txt(email).up();
+  }
+
   // SpecifiedTaxRegistration — after PostalTradeAddress
   if (tva) {
     // BT-31 : Seller VAT identifier
@@ -198,6 +212,24 @@ export function generateFacturXXML(invoice: InvoiceData): string {
   exDoc.ele('ram:TypeCode').txt('380');
   exDoc.ele('ram:IssueDateTime')
     .ele('udt:DateTimeString', { format: '102' }).txt(invoiceDate).up();
+
+  // Mentions légales françaises (BR-FR-05/BT-22). Elles ne sont émises que
+  // si elles figurent sur la facture source : inventer le texte reviendrait
+  // à modifier les conditions commerciales du vendeur.
+  const legalMentions: { code: string; text?: string }[] = [
+    { code: 'PMD', text: str(invoice.latePaymentPenalties) },
+    { code: 'PMT', text: str(invoice.recoveryFee) },
+    { code: 'AAB', text: str(invoice.earlyPaymentDiscount) },
+  ];
+  for (const mention of legalMentions) {
+    if (!mention.text) continue;
+    const note = exDoc.ele('ram:IncludedNote');
+    note.ele('ram:Content').txt(mention.text);
+    note.ele('ram:SubjectCode').txt(mention.code);
+  }
+  if (str(invoice.notes)) {
+    exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(str(invoice.notes)!).up();
+  }
   const notes = str(invoice.notes);
   if (notes) {
     exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(notes).up();
@@ -309,6 +341,21 @@ export function findConformanceGaps(invoice: InvoiceData): string[] {
   // identifier, whatever the VAT category of the lines.
   if (!str(invoice.seller.tvaNumber) && !str(invoice.seller.siret)) {
     gaps.push("le SIRET et le numéro de TVA du vendeur sont absents (au moins l'un des deux est exigé)");
+  }
+
+  // BR-FR-05/BT-22 : mentions obligatoires sur toute facture française.
+  const missingMentions = [
+    !str(invoice.latePaymentPenalties) && 'pénalités de retard',
+    !str(invoice.recoveryFee) && 'indemnité forfaitaire de recouvrement',
+    !str(invoice.earlyPaymentDiscount) && 'escompte',
+  ].filter(Boolean) as string[];
+  if (missingMentions.length > 0) {
+    gaps.push(`mentions légales absentes de la facture source : ${missingMentions.join(', ')}`);
+  }
+
+  // BR-FR-12/BT-49 et BR-FR-13/BT-34 : adresses électroniques des parties.
+  if (!str(invoice.seller.email) || !str(invoice.buyer.email)) {
+    gaps.push("adresse électronique du vendeur ou de l'acheteur absente");
   }
 
   return gaps;
