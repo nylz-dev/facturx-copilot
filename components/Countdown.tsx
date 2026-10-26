@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 
 function getDaysLeft(): number {
-  const deadline = new Date('2026-09-01T00:00:00Z');
+  // PME, TPE and micro-entreprises must issue e-invoices from 1 Sept 2027.
+  const deadline = new Date('2027-09-01T00:00:00Z');
   const now = new Date();
   const diff = deadline.getTime() - now.getTime();
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));

@@ -2,14 +2,91 @@ import UploadZone from '@/components/UploadZone';
 import Countdown from '@/components/Countdown';
 import MobileMenu from '@/components/MobileMenu';
 import CheckoutButton from '@/components/CheckoutButton';
+import Link from 'next/link';
+import { SITE_URL, JsonLd, organizationJsonLd } from '@/lib/site';
+import { getAllPosts } from '@/lib/blog';
 
-export default function Home() {
+const FAQ = [
+  {
+    q: "Qu'est-ce que Factur-X ?",
+    a: "Factur-X est un format de facture électronique hybride franco-allemand : un PDF/A-3 lisible par l'humain dans lequel est intégré un fichier XML structuré (syntaxe CII, norme européenne EN 16931), lisible par les logiciels comptables. C'est l'un des trois formats acceptés par la réforme française, avec UBL et CII.",
+  },
+  {
+    q: 'Quand la facturation électronique devient-elle obligatoire ?',
+    a: "Depuis le 1er septembre 2026, toutes les entreprises assujetties à la TVA en France doivent pouvoir recevoir des factures électroniques, et les grandes entreprises et ETI doivent les émettre. Les PME, TPE et micro-entreprises devront émettre leurs factures au format électronique à partir du 1er septembre 2027.",
+  },
+  {
+    q: 'Un fichier Factur-X suffit-il pour être en règle ?',
+    a: "Le format est une condition nécessaire mais pas suffisante : dans le cadre de la réforme, les factures entre entreprises doivent transiter par une plateforme agréée (PA, anciennement PDP). FacturXPro produit un fichier Factur-X conforme EN 16931 que vous pouvez déposer sur la plateforme agréée de votre choix, envoyer à votre expert-comptable ou utiliser dès aujourd'hui avec vos clients.",
+  },
+  {
+    q: 'Quel profil Factur-X est généré ?',
+    a: "FacturXPro génère le profil BASIC (et EN 16931 sur les offres payantes), conformes à la norme EN 16931. Les profils MINIMUM et BASIC WL ne contiennent pas les lignes de facture et ne sont pas suffisants pour la réforme.",
+  },
+  {
+    q: 'Mes données sont-elles sécurisées ?',
+    a: "Le traitement est 100% éphémère : votre PDF est analysé en mémoire et jamais stocké. L'IA utilisée est Mistral AI, entreprise française dont les serveurs sont en Europe — conformité RGPD native, aucun transfert hors UE.",
+  },
+  {
+    q: 'Mon logiciel comptable est-il compatible ?',
+    a: "Factur-X est un standard ouvert : le fichier généré peut être importé par les logiciels comptables qui gèrent ce format (Sage, Cegid, EBP, Pennylane, etc.) et déposé sur les plateformes agréées qui l'acceptent.",
+  },
+  {
+    q: 'Que faire si ma facture est scannée ?',
+    a: "FacturXPro gère les PDFs scannés automatiquement grâce à Mistral OCR. Si votre PDF est une image, l'IA le lit quand même et extrait toutes les données. Aucun outil tiers nécessaire.",
+  },
+  {
+    q: 'Puis-je corriger les données extraites ?',
+    a: "Oui, sur les plans Pro et Cabinet, vous pouvez vérifier et corriger chaque champ extrait avant de générer le fichier final.",
+  },
+];
+
+
+export const revalidate = 3600;
+
+export default async function Home() {
+  const guides = (await getAllPosts()).slice(0, 6);
+
   return (
     <main className="min-h-screen bg-white">
+      <JsonLd
+        data={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            organizationJsonLd,
+            {
+              '@type': 'WebSite',
+              '@id': `${SITE_URL}/#website`,
+              url: SITE_URL,
+              name: 'FacturXPro',
+              inLanguage: 'fr-FR',
+              publisher: { '@id': `${SITE_URL}/#organization` },
+            },
+            {
+              '@type': 'SoftwareApplication',
+              name: 'FacturXPro',
+              url: SITE_URL,
+              applicationCategory: 'BusinessApplication',
+              operatingSystem: 'Web',
+              description: 'Convertisseur en ligne de factures PDF (natives ou scannées) en Factur-X PDF/A-3 avec XML EN 16931, propulsé par Mistral AI.',
+              offers: [
+                { '@type': 'Offer', name: 'Découverte', price: '0', priceCurrency: 'EUR' },
+                { '@type': 'Offer', name: 'Pro', price: '19', priceCurrency: 'EUR' },
+                { '@type': 'Offer', name: 'Cabinet / API', price: '49', priceCurrency: 'EUR' },
+              ],
+              publisher: { '@id': `${SITE_URL}/#organization` },
+            },
+            {
+              '@type': 'FAQPage',
+              mainEntity: FAQ.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+            },
+          ],
+        }}
+      />
 
       {/* ─── Top urgency banner ─── */}
       <div className="bg-orange-500 text-white text-sm font-semibold text-center py-2 px-4">
-        ⚠️ Obligation légale : 1er septembre 2026 — <Countdown /> avant la mise en conformité obligatoire
+        ⚠️ PME et TPE : émission de factures électroniques obligatoire le 1er septembre 2027 — plus que <Countdown />
       </div>
 
       {/* ─── Header ─── */}
@@ -23,6 +100,7 @@ export default function Home() {
             <a href="#how" className="hover:text-slate-900 transition-colors">Comment ça marche</a>
             <a href="#pricing" className="hover:text-slate-900 transition-colors">Tarifs</a>
             <a href="#faq" className="hover:text-slate-900 transition-colors">FAQ</a>
+            <Link href="/blog" className="hover:text-slate-900 transition-colors">Guides</Link>
           </nav>
           <a
             href="#upload"
@@ -39,7 +117,7 @@ export default function Home() {
         <div className="max-w-3xl mx-auto text-center">
           <div className="flex flex-wrap justify-center gap-3 mb-8">
             <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-100">
-              🇫🇷 Réforme facturation électronique 2026
+              🇫🇷 Réforme facturation électronique 2026-2027
             </span>
             <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-semibold px-3 py-1.5 rounded-full border border-green-100">
               🔒 RGPD natif — données traitées en France
@@ -54,14 +132,15 @@ export default function Home() {
             <span className="text-blue-600">Factur-X en 30 secondes</span>
           </h1>
           <p className="text-lg text-slate-500 max-w-2xl mx-auto mb-8">
-            À partir du <strong className="text-slate-700">1er septembre 2026</strong>, toutes les PME françaises devront émettre des factures au format hybride Factur-X.{' '}
-            <strong className="text-slate-700">4 millions d'entreprises ne sont pas encore prêtes.</strong> Soyez conforme maintenant.
+            Depuis le <strong className="text-slate-700">1er septembre 2026</strong>, toutes les entreprises doivent pouvoir recevoir des factures électroniques.
+            Les PME et TPE devront les <strong className="text-slate-700">émettre au 1er septembre 2027</strong>.{' '}
+            Convertissez vos factures PDF au format Factur-X (EN 16931) dès maintenant, sans changer de logiciel.
           </p>
 
           {/* Trust indicators */}
           <div className="flex flex-wrap justify-center gap-6 text-xs text-slate-400 font-medium mb-12">
             <span>✅ PDFs natifs & scannés</span>
-            <span>✅ Profil BASIC conforme PPF/PDP</span>
+            <span>✅ Profil BASIC conforme EN 16931</span>
             <span>✅ Aucun stockage de vos données</span>
             <span>✅ Résultat immédiat</span>
           </div>
@@ -100,7 +179,7 @@ export default function Home() {
                 icon: '✅',
                 step: '03',
                 title: 'Téléchargez le Factur-X',
-                desc: 'PDF hybride avec XML Factur-X intégré, conforme PPF/PDP. Prêt à envoyer à vos clients ou votre expert-comptable.',
+                desc: 'PDF hybride avec XML Factur-X intégré, conforme EN 16931. Prêt à déposer sur votre plateforme agréée ou à envoyer à votre expert-comptable.',
               },
             ].map((s) => (
               <div key={s.step} className="bg-white rounded-2xl p-7 border border-slate-100 shadow-sm">
@@ -182,33 +261,34 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ─── Guides ─── */}
+      <section id="guides" className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-extrabold text-slate-900 mb-3">Guides facturation électronique</h2>
+            <p className="text-slate-500">Calendrier, formats, mentions obligatoires : tout ce qu'il faut savoir avant septembre 2027.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {guides.map((g) => (
+              <Link key={g.slug} href={`/blog/${g.slug}`} className="block rounded-2xl border border-slate-100 p-6 hover:border-blue-200 hover:shadow-sm transition">
+                <span className="text-xs font-semibold text-blue-600 uppercase tracking-widest">{g.category}</span>
+                <h3 className="font-bold text-slate-900 mt-2 mb-2 leading-snug">{g.title}</h3>
+                <p className="text-sm text-slate-500 line-clamp-3">{g.description}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <Link href="/blog" className="text-blue-600 font-semibold hover:text-blue-700">Tous les guides &rarr;</Link>
+          </div>
+        </div>
+      </section>
+
       {/* ─── FAQ ─── */}
       <section id="faq" className="bg-slate-50 py-20 px-6">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-extrabold text-slate-900 mb-10 text-center">Questions fréquentes</h2>
           <div className="space-y-4">
-            {[
-              {
-                q: "Qu'est-ce que Factur-X ?",
-                a: "Factur-X est un standard de facturation électronique hybride : un PDF lisible par l'humain avec un fichier XML structuré intégré, lisible par les logiciels comptables et les plateformes d'État (PPF/PDP).",
-              },
-              {
-                q: 'Mes données sont-elles sécurisées ?',
-                a: "Le traitement est 100% éphémère : votre PDF est analysé en mémoire et jamais stocké. L'IA utilisée est Mistral AI, entreprise française dont les serveurs sont en Europe — conformité RGPD native, aucun transfert hors UE.",
-              },
-              {
-                q: 'Mon ERP est-il compatible ?',
-                a: "Le profil BASIC généré est compatible avec tous les ERP du marché (Sage, Cegid, EBP, Pennylane, etc.) et les plateformes PDP/PPF de l'État.",
-              },
-              {
-                q: 'Que faire si ma facture est scannée ?',
-                a: "FacturX Pro gère les PDFs scannés automatiquement grâce à Mistral OCR. Si votre PDF est une image, l'IA le lit quand même et extrait toutes les données. Aucun outil tiers nécessaire.",
-              },
-              {
-                q: 'Puis-je corriger les données extraites ?',
-                a: "Oui, sur les plans Pro et Cabinet, vous pouvez vérifier et corriger chaque champ extrait avant de générer le fichier final.",
-              },
-            ].map(({ q, a }) => (
+            {FAQ.map(({ q, a }) => (
               <div key={q} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm">
                 <p className="font-semibold text-slate-800 mb-1.5">{q}</p>
                 <p className="text-sm text-slate-500 leading-relaxed">{a}</p>
@@ -229,7 +309,7 @@ export default function Home() {
               </div>
               <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
                 Solution de conformité Factur-X pour les PME françaises.<br />
-                Conforme EN16931 / Factur-X 1.0 BASIC.
+                Conforme EN 16931 / Factur-X 1.0 BASIC.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-8 text-sm">
@@ -239,6 +319,7 @@ export default function Home() {
                   <li><a href="#how" className="hover:text-slate-600">Comment ça marche</a></li>
                   <li><a href="#pricing" className="hover:text-slate-600">Tarifs</a></li>
                   <li><a href="#faq" className="hover:text-slate-600">FAQ</a></li>
+                  <li><Link href="/blog" className="hover:text-slate-600">Guides facturation électronique</Link></li>
                 </ul>
               </div>
               <div>

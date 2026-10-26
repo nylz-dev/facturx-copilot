@@ -12,6 +12,7 @@
     "@mistralai/mistralai": "^1.15.1",
     "@supabase/supabase-js": "^2.99.2",
     "@types/pdf-parse": "^1.1.5",
+    "marked": "^14.1.4",
     "next": "^16.1.6",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
@@ -23,6 +24,7 @@
     "xmlbuilder2": "^3.1.1"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

@@ -1,0 +1,29 @@
+# FacturXPro
+
+> FacturXPro (https://facturexpro.fr) est un convertisseur en ligne qui transforme des factures PDF (natives ou scannées) en factures Factur-X : un PDF/A-3 contenant un XML conforme à la norme européenne EN 16931 (profil BASIC, EN 16931 sur les offres payantes). L'extraction des données utilise Mistral AI (France), les fichiers ne sont pas stockés. Public : PME, TPE, indépendants et cabinets comptables français concernés par la facturation électronique obligatoire.
+
+Faits clés :
+- Offre Découverte gratuite : 3 conversions par mois, sans inscription.
+- Offre Pro : 19 €/mois, 100 conversions, profils BASIC et EN 16931, correction des champs, export XML.
+- Offre Cabinet / API : 49 €/mois, conversions illimitées, API REST.
+- FacturXPro n'est pas une plateforme agréée (PA) : c'est un outil de conversion en amont.
+- Calendrier de la réforme : réception obligatoire pour toutes les entreprises depuis le 1er septembre 2026 ; émission obligatoire pour les grandes entreprises et ETI depuis le 1er septembre 2026, pour les PME, TPE et micro-entreprises à partir du 1er septembre 2027.
+
+## Guides
+
+- [Calendrier de la facturation électronique obligatoire 2026-2027](https://facturexpro.fr/blog/calendrier-facturation-electronique-obligatoire)
+- [Factur-X : définition et profils](https://facturexpro.fr/blog/factur-x-definition-profils)
+- [Nouvelles mentions obligatoires sur les factures](https://facturexpro.fr/blog/nouvelles-mentions-obligatoires-factures)
+- [Convertir une facture PDF en Factur-X](https://facturexpro.fr/blog/convertir-facture-pdf-en-factur-x)
+- [Plateforme agréée (PA, ex-PDP) : rôle et choix](https://facturexpro.fr/blog/plateforme-agreee-pa-pdp-choisir)
+- [Factur-X, UBL ou CII : différences](https://facturexpro.fr/blog/factur-x-ubl-cii-differences)
+- [Sanctions de la facturation électronique](https://facturexpro.fr/blog/sanctions-facturation-electronique)
+- [Facturation électronique et auto-entrepreneur](https://facturexpro.fr/blog/facturation-electronique-auto-entrepreneur)
+- [E-reporting : définition et obligations](https://facturexpro.fr/blog/e-reporting-definition-obligations)
+
+## Pages
+
+- [Accueil et convertisseur](https://facturexpro.fr/)
+- [Blog](https://facturexpro.fr/blog)
+- [Mentions légales](https://facturexpro.fr/mentions-legales)
+- [Politique RGPD](https://facturexpro.fr/rgpd)
