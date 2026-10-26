@@ -1,30 +1,32 @@
 /**
- * In-memory IP quota tracker.
- * Soft limit: 3 free conversions per IP per month.
- * Resets on cold start — acceptable for MVP.
+ * Persistent conversion quota, backed by Postgres (Supabase).
+ * Atomic check-and-increment via the facturx_consume_quota RPC —
+ * survives cold starts and serverless instance churn, unlike an
+ * in-memory counter.
  */
-
-const quotaStore = new Map<string, number>();
-
-function getKey(ip: string): string {
-  const yearMonth = new Date().toISOString().slice(0, 7); // "2026-03"
-  return `${ip}:${yearMonth}`;
-}
+import { getSupabaseAdmin } from './supabase-admin';
 
 export const FREE_LIMIT = 3;
 
-export function getUsage(ip: string): number {
-  return quotaStore.get(getKey(ip)) ?? 0;
+function currentPeriod(): string {
+  return new Date().toISOString().slice(0, 7); // "2026-09"
 }
 
-export function isQuotaExceeded(ip: string): boolean {
-  return getUsage(ip) >= FREE_LIMIT;
-}
+export async function consumeQuota(
+  identity: string,
+  limit: number = FREE_LIMIT
+): Promise<{ allowed: boolean; used: number }> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.rpc('facturx_consume_quota', {
+    p_identity: identity,
+    p_period: currentPeriod(),
+    p_limit: limit,
+  });
 
-export function incrementUsage(ip: string): number {
-  const key = getKey(ip);
-  const current = quotaStore.get(key) ?? 0;
-  const next = current + 1;
-  quotaStore.set(key, next);
-  return next;
+  if (error) {
+    throw new Error(`Vérification du quota impossible : ${error.message}`);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return { allowed: row.allowed, used: row.used };
 }

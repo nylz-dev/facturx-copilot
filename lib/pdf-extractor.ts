@@ -53,6 +53,11 @@ RÈGLES STRICTES :
 - statedTotalHT, statedTotalTVA, statedTotalTTC : montants EXACTEMENT tels qu'écrits sur la facture (nombres décimaux)
 - Si une donnée est absente, utilise null ou ""
 - Retourne UNIQUEMENT le JSON brut, sans markdown
+- email : l'adresse e-mail de contact de chaque partie, si elle figure sur la facture
+- latePaymentPenalties / recoveryFee / earlyPaymentDiscount : recopie MOT POUR MOT
+  la mention correspondante si elle est imprimée sur la facture (pénalités de
+  retard, indemnité forfaitaire de recouvrement de 40 €, escompte). N'invente
+  jamais ces textes : mets null si la mention est absente.
 
 STRUCTURE :
 {
@@ -70,7 +75,8 @@ STRUCTURE :
     "addressLine1": "string ou null",
     "city": "string ou null",
     "postalCode": "string ou null",
-    "country": "FR"
+    "country": "FR",
+    "email": "string ou null"
   },
   "buyer": {
     "name": "string",
@@ -79,7 +85,8 @@ STRUCTURE :
     "addressLine1": "string ou null",
     "city": "string ou null",
     "postalCode": "string ou null",
-    "country": "FR"
+    "country": "FR",
+    "email": "string ou null"
   },
   "lines": [
     {
@@ -90,6 +97,9 @@ STRUCTURE :
     }
   ],
   "notes": "string ou null",
+  "latePaymentPenalties": "string ou null",
+  "recoveryFee": "string ou null",
+  "earlyPaymentDiscount": "string ou null",
   "iban": "string ou null",
   "bic": "string ou null"
 }

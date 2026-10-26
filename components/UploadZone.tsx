@@ -8,6 +8,8 @@ interface UploadResult {
   totalTTC: string;
   blobUrl: string;
   freeRemaining: number | null;
+  fontWarning: string | null;
+  dataWarning: string | null;
 }
 
 type Step = 'idle' | 'uploading' | 'extracting' | 'generating' | 'done' | 'error' | 'quota_exceeded';
@@ -31,8 +33,12 @@ export default function UploadZone() {
   const [errorMsg, setErrorMsg] = useState('');
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<'single' | 'pro' | null>(null);
+  const [licenceKey, setLicenceKey] = useState<string | null>(null);
+  const [licenceInput, setLicenceInput] = useState('');
+  const [showLicenceForm, setShowLicenceForm] = useState(false);
 
-  // On mount: check for ?token= in URL (redirect back from Stripe 1€)
+  // On mount: check for ?token= in URL (redirect back from Stripe 1€),
+  // and restore a previously saved licence key (Pro/Cabinet subscribers)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
@@ -43,7 +49,36 @@ export default function UploadZone() {
       url.searchParams.delete('token');
       window.history.replaceState({}, '', url.toString());
     }
+
+    try {
+      const saved = window.localStorage.getItem('facturx_licence_key');
+      if (saved) setLicenceKey(saved);
+    } catch {
+      // localStorage unavailable (private browsing) — licence key input still works per-session
+    }
   }, []);
+
+  const saveLicenceKey = () => {
+    const trimmed = licenceInput.trim();
+    if (!trimmed) return;
+    setLicenceKey(trimmed);
+    setShowLicenceForm(false);
+    try {
+      window.localStorage.setItem('facturx_licence_key', trimmed);
+    } catch {
+      // ignore — key stays active for this session only
+    }
+  };
+
+  const clearLicenceKey = () => {
+    setLicenceKey(null);
+    setLicenceInput('');
+    try {
+      window.localStorage.removeItem('facturx_licence_key');
+    } catch {
+      // ignore
+    }
+  };
 
   const handleCheckout = async (plan: 'single' | 'pro' | 'cabinet') => {
     const isSingle = plan === 'single';
@@ -89,7 +124,11 @@ export default function UploadZone() {
 
       try {
         setStep('extracting');
-        const res = await fetch('/api/convert', { method: 'POST', body: formData });
+        const res = await fetch('/api/convert', {
+          method: 'POST',
+          body: formData,
+          headers: licenceKey ? { 'x-licence-key': licenceKey } : undefined,
+        });
 
         if (res.status === 402) {
           const data = await res.json();
@@ -119,20 +158,22 @@ export default function UploadZone() {
         const totalTTC = res.headers.get('X-Total-TTC') ?? 'N/A';
         const freeRemainingRaw = res.headers.get('X-Free-Remaining');
         const freeRemaining = freeRemainingRaw !== null ? parseInt(freeRemainingRaw, 10) : null;
+        const fontWarning = res.headers.get('X-PDFA-Font-Warning');
+        const dataWarning = res.headers.get('X-Facturx-Data-Warning');
 
         // Clear token after successful single use
         if (token) {
           setActiveToken(null);
         }
 
-        setResult({ fileName: `facturx_${invoiceNumber}.pdf`, invoiceNumber, totalTTC, blobUrl, freeRemaining });
+        setResult({ fileName: `facturx_${invoiceNumber}.pdf`, invoiceNumber, totalTTC, blobUrl, freeRemaining, fontWarning, dataWarning });
         setStep('done');
       } catch (err: unknown) {
         setErrorMsg(err instanceof Error ? err.message : 'Erreur inconnue');
         setStep('error');
       }
     },
-    []
+    [licenceKey]
   );
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -165,6 +206,47 @@ export default function UploadZone() {
             <p className="font-semibold text-green-800">Token de conversion actif</p>
             <p className="text-green-600 text-xs">Déposez votre PDF — cette conversion est débloquée.</p>
           </div>
+        </div>
+      )}
+
+      {/* Licence key (Pro / Cabinet subscribers) */}
+      {step === 'idle' && !activeToken && (
+        <div className="mb-4">
+          {licenceKey ? (
+            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm">
+              <span className="text-2xl">🔑</span>
+              <div className="flex-1">
+                <p className="font-semibold text-blue-800">Clé de licence active</p>
+                <p className="text-blue-600 text-xs font-mono truncate">{licenceKey}</p>
+              </div>
+              <button onClick={clearLicenceKey} className="text-xs text-blue-500 hover:text-blue-700 shrink-0">
+                Retirer
+              </button>
+            </div>
+          ) : showLicenceForm ? (
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <input
+                type="text"
+                value={licenceInput}
+                onChange={(e) => setLicenceInput(e.target.value)}
+                placeholder="Collez votre clé de licence (abonné Pro / Cabinet)"
+                className="flex-1 bg-transparent text-sm px-1 py-1 focus:outline-none"
+              />
+              <button onClick={saveLicenceKey} className="text-xs font-semibold text-blue-600 hover:text-blue-700 shrink-0">
+                Valider
+              </button>
+              <button onClick={() => setShowLicenceForm(false)} className="text-xs text-slate-400 hover:text-slate-600 shrink-0">
+                Annuler
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLicenceForm(true)}
+              className="text-xs text-slate-400 hover:text-blue-600 transition-colors"
+            >
+              Déjà abonné Pro / Cabinet ? Entrez votre clé de licence →
+            </button>
+          )}
         </div>
       )}
 
@@ -264,6 +346,31 @@ export default function UploadZone() {
               </div>
             )}
           </div>
+
+          {(result.fontWarning || result.dataWarning) && (
+            <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm space-y-3">
+              {result.dataWarning && (
+                <div>
+                  <p className="font-semibold text-amber-800 mb-1">⚠️ Données manquantes sur la facture</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    {result.dataWarning}. Le XML est généré, mais il sera refusé par les contrôles EN16931 :
+                    complétez la facture source puis reconvertissez.
+                  </p>
+                </div>
+              )}
+              {result.fontWarning && (
+                <div>
+                  <p className="font-semibold text-amber-800 mb-1">⚠️ Polices non embarquées dans votre PDF source</p>
+                  <p className="text-amber-700 text-xs leading-relaxed">
+                    Le XML Factur-X est correct et exploitable, mais la norme PDF/A-3 exige que toutes les polices
+                    soient embarquées — ce n'est pas le cas de : <span className="font-mono">{result.fontWarning}</span>.
+                    Pour un fichier 100% conforme, réexportez votre facture en cochant « incorporer les polices »
+                    (ou en PDF/A) depuis votre logiciel, puis reconvertissez.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <a
             href={result.blobUrl}
