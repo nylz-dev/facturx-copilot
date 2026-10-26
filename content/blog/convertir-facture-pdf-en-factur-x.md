@@ -24,7 +24,7 @@ Le résultat est un seul fichier PDF, visuellement identique à l'original, mais
 2. **L'IA extrait les données.** Le modèle de Mistral AI (entreprise française, serveurs en Europe) lit la facture et remplit chaque champ. Sur les offres payantes, vous pouvez vérifier et corriger les champs avant la génération.
 3. **Téléchargez votre Factur-X.** Le fichier est généré en profil BASIC (EN 16931 sur les offres Pro et Cabinet). Rien n'est stocké sur nos serveurs.
 
-L'offre Découverte permet de convertir **3 factures par mois gratuitement**.
+L'offre Découverte permet de convertir **3 factures par mois gratuitement**, ce qui suffit à la plupart des [auto-entrepreneurs](/blog/facturation-electronique-auto-entrepreneur) pour tester leurs factures.
 
 ## Les points à vérifier avant d'envoyer
 

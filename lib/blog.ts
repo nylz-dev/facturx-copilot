@@ -111,6 +111,12 @@ export async function getPost(slug: string): Promise<Post | undefined> {
   return (await getAllPosts()).find((p) => p.slug === slug);
 }
 
+// Same-category articles first, then the most recent ones: keeps internal links on topic.
+export async function getRelatedPosts(post: Post, limit = 3): Promise<Post[]> {
+  const others = (await getAllPosts()).filter((p) => p.slug !== post.slug);
+  return [...others.filter((p) => p.category === post.category), ...others.filter((p) => p.category !== post.category)].slice(0, limit);
+}
+
 export function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
 }

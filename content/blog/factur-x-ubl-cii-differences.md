@@ -36,7 +36,7 @@ CII (Cross Industry Invoice) est la syntaxe XML définie par l'UN/CEFACT. Le fic
 - **Votre logiciel de facturation exporte nativement un format** : utilisez celui qu'il propose, la plateforme agréée s'occupe de la transmission.
 - **Vous travaillez avec des acheteurs publics ou à l'international** : vérifiez si UBL via Peppol est attendu.
 
-Dans tous les cas, c'est la **plateforme agréée** qui transmet la facture au destinataire ; elle peut convertir d'un format à l'autre selon ses services.
+Dans tous les cas, c'est la **[plateforme agréée](/blog/plateforme-agreee-pa-pdp-choisir)** qui transmet la facture au destinataire ; elle peut convertir d'un format à l'autre selon ses services.
 
 ## Questions fréquentes
 

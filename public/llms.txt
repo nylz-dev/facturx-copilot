@@ -18,6 +18,8 @@ Faits clés :
 - [Plateforme agréée (PA, ex-PDP) : rôle et choix](https://facturexpro.fr/blog/plateforme-agreee-pa-pdp-choisir)
 - [Factur-X, UBL ou CII : différences](https://facturexpro.fr/blog/factur-x-ubl-cii-differences)
 - [Sanctions de la facturation électronique](https://facturexpro.fr/blog/sanctions-facturation-electronique)
+- [Facturation électronique et auto-entrepreneur](https://facturexpro.fr/blog/facturation-electronique-auto-entrepreneur)
+- [E-reporting : définition et obligations](https://facturexpro.fr/blog/e-reporting-definition-obligations)
 
 ## Pages
 

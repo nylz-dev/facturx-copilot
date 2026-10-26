@@ -36,7 +36,7 @@ Voir [le calendrier complet](/blog/calendrier-facturation-electronique-obligatoi
 1. **Les formats acceptés en import** : votre plateforme accepte-t-elle les fichiers Factur-X, UBL ou CII que produit votre outil ? Si vous facturez en PDF, privilégiez une plateforme qui accepte l'import Factur-X ou qui convertit vos PDF.
 2. **L'intégration avec votre logiciel** comptable ou de facturation (connecteur natif, API, import manuel).
 3. **Le prix** : abonnement mensuel, coût par facture, coûts de réception.
-4. **La gestion du e-reporting** si vous vendez à des particuliers ou à l'international.
+4. **La gestion de l'[e-reporting](/blog/e-reporting-definition-obligations)** si vous vendez à des particuliers ou à l'international.
 5. **L'archivage** des factures pendant la durée légale (10 ans en comptabilité, 6 ans au titre fiscal).
 6. **L'accompagnement** : support en français, aide à la mise en route, lien avec votre expert-comptable.
 

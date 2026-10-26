@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { getAllPosts, getPost, formatDate } from '@/lib/blog';
+import { getAllPosts, getPost, getRelatedPosts, formatDate } from '@/lib/blog';
 import { SITE_URL, SITE_NAME, JsonLd, organizationJsonLd } from '@/lib/site';
 
 export const revalidate = 3600;
@@ -42,7 +42,7 @@ export default async function ArticlePage({ params }: Props) {
   const post = await getPost(slug);
   if (!post) notFound();
 
-  const related = (await getAllPosts()).filter((p) => p.slug !== post.slug).slice(0, 3);
+  const related = await getRelatedPosts(post);
   const url = `${SITE_URL}/blog/${post.slug}`;
 
   return (

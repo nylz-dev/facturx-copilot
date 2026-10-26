@@ -4,6 +4,7 @@ import MobileMenu from '@/components/MobileMenu';
 import CheckoutButton from '@/components/CheckoutButton';
 import Link from 'next/link';
 import { SITE_URL, JsonLd, organizationJsonLd } from '@/lib/site';
+import { getAllPosts } from '@/lib/blog';
 
 const FAQ = [
   {
@@ -41,7 +42,11 @@ const FAQ = [
 ];
 
 
-export default function Home() {
+export const revalidate = 3600;
+
+export default async function Home() {
+  const guides = (await getAllPosts()).slice(0, 6);
+
   return (
     <main className="min-h-screen bg-white">
       <JsonLd
@@ -252,6 +257,28 @@ export default function Home() {
               </CheckoutButton>
             </div>
 
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Guides ─── */}
+      <section id="guides" className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-extrabold text-slate-900 mb-3">Guides facturation électronique</h2>
+            <p className="text-slate-500">Calendrier, formats, mentions obligatoires : tout ce qu'il faut savoir avant septembre 2027.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {guides.map((g) => (
+              <Link key={g.slug} href={`/blog/${g.slug}`} className="block rounded-2xl border border-slate-100 p-6 hover:border-blue-200 hover:shadow-sm transition">
+                <span className="text-xs font-semibold text-blue-600 uppercase tracking-widest">{g.category}</span>
+                <h3 className="font-bold text-slate-900 mt-2 mb-2 leading-snug">{g.title}</h3>
+                <p className="text-sm text-slate-500 line-clamp-3">{g.description}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <Link href="/blog" className="text-blue-600 font-semibold hover:text-blue-700">Tous les guides &rarr;</Link>
           </div>
         </div>
       </section>

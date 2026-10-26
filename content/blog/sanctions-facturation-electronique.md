@@ -13,7 +13,7 @@ Ne pas respecter l'obligation de facturation électronique expose à des **amend
 | Manquement | Amende | Plafond annuel |
 |---|---|---|
 | Facture non émise au format électronique alors que l'obligation s'applique | 15 € par facture | 15 000 € |
-| Défaut de transmission des données d'e-reporting | 250 € par transmission | 15 000 € |
+| Défaut de transmission des données d'[e-reporting](/blog/e-reporting-definition-obligations) | 250 € par transmission | 15 000 € |
 
 Ces amendes s'ajoutent aux sanctions classiques liées aux factures, notamment l'amende de **15 € par mention manquante ou inexacte**, plafonnée au quart du montant de la facture. Voir [la liste des mentions obligatoires](/blog/nouvelles-mentions-obligatoires-factures).
 

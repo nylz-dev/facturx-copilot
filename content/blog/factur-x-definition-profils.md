@@ -46,7 +46,7 @@ Trois options :
 
 1. **Votre logiciel de facturation** l'exporte nativement (de plus en plus d'éditeurs le proposent).
 2. **Votre plateforme agréée** convertit vos factures au moment de l'émission.
-3. **Un convertisseur en ligne** comme FacturXPro transforme une facture PDF existante en Factur-X : l'IA extrait les données, génère le XML EN 16931 et l'intègre dans un PDF/A-3. Voir [le guide pas à pas](/blog/convertir-facture-pdf-en-factur-x).
+3. **Un convertisseur en ligne** comme FacturXPro transforme une facture PDF existante en Factur-X : l'IA extrait les données, génère le XML EN 16931 et l'intègre dans un PDF/A-3. Voir [le guide pas à pas](/blog/convertir-facture-pdf-en-factur-x). Pour savoir quand ce format devient obligatoire pour vous, consultez [le calendrier de la réforme](/blog/calendrier-facturation-electronique-obligatoire).
 
 ## Questions fréquentes
 

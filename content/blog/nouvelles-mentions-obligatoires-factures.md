@@ -6,7 +6,7 @@ date: 2026-10-12
 updated: 2026-10-26
 ---
 
-La réforme de la facturation électronique ajoute **quatre nouvelles mentions obligatoires** sur les factures entre entreprises. Elles s'appliquent avec l'obligation d'émission électronique : depuis septembre 2026 pour les grandes entreprises et ETI, à partir de septembre 2027 pour les PME, TPE et micro-entreprises. Rien n'empêche de les ajouter dès maintenant.
+La réforme de la facturation électronique ajoute **quatre nouvelles mentions obligatoires** sur les factures entre entreprises. Elles s'appliquent avec l'obligation d'émission électronique : depuis septembre 2026 pour les grandes entreprises et ETI, à partir de septembre 2027 pour les PME, TPE et micro-entreprises ([voir le calendrier](/blog/calendrier-facturation-electronique-obligatoire)). Rien n'empêche de les ajouter dès maintenant.
 
 ## Les 4 nouvelles mentions
 
@@ -34,7 +34,7 @@ En plus de ces nouveautés, une facture entre professionnels doit toujours compo
 
 ## Pourquoi ces données sont essentielles en format électronique
 
-Dans une facture Factur-X, chaque mention correspond à un champ du XML. Une facture dont le SIREN de l'acheteur est absent ou erroné peut être rejetée par la plateforme agréée. C'est pourquoi il est utile de **contrôler ses modèles de facture avant l'échéance** : convertir une facture existante en Factur-X permet de voir immédiatement quels champs manquent.
+Dans une facture Factur-X, chaque mention correspond à un champ du XML. Une facture dont le SIREN de l'acheteur est absent ou erroné peut être rejetée par la plateforme agréée. C'est pourquoi il est utile de **contrôler ses modèles de facture avant l'échéance** : [convertir une facture existante en Factur-X](/blog/convertir-facture-pdf-en-factur-x) permet de voir immédiatement quels champs manquent.
 
 ## Checklist rapide
 
@@ -60,4 +60,4 @@ Une mention manquante ou inexacte peut entraîner une amende de 15 € par menti
 
 ### Un micro-entrepreneur doit-il indiquer la nature de l'opération ?
 
-Oui, la mention relative à la nature des opérations s'applique à toutes les entreprises soumises à l'obligation de facturation électronique, y compris les micro-entrepreneurs.
+Oui, la mention relative à la nature des opérations s'applique à toutes les entreprises soumises à l'obligation de facturation électronique, y compris les micro-entrepreneurs (voir [le guide auto-entrepreneur](/blog/facturation-electronique-auto-entrepreneur)).

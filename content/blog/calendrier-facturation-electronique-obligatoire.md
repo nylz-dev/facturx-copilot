@@ -30,12 +30,12 @@ La catégorie est déterminée à partir des critères de l'INSEE (effectif, chi
 - **ETI** : moins de 5 000 salariés et chiffre d'affaires n'excédant pas 1,5 Md€ ou total de bilan n'excédant pas 2 Md€.
 - **Grande entreprise** : au-delà de ces seuils.
 
-Les micro-entrepreneurs, y compris ceux en franchise en base de TVA, sont concernés : ils doivent déjà pouvoir recevoir des factures électroniques et devront les émettre en 2027.
+Les micro-entrepreneurs, y compris ceux en franchise en base de TVA, sont concernés : ils doivent déjà pouvoir recevoir des factures électroniques et devront les émettre en 2027. Tout le détail dans [notre guide pour les auto-entrepreneurs](/blog/facturation-electronique-auto-entrepreneur).
 
 ## Quelles opérations sont concernées ?
 
 - **E-invoicing** : les factures entre entreprises assujetties à la TVA établies en France (B2B domestique) doivent être émises, transmises et reçues sous forme électronique.
-- **E-reporting** : les opérations qui ne relèvent pas du B2B domestique (ventes aux particuliers, opérations internationales) donnent lieu à une transmission de données à l'administration, ainsi que les données de paiement pour les prestations de services.
+- **E-reporting** : les opérations qui ne relèvent pas du B2B domestique (ventes aux particuliers, opérations internationales) donnent lieu à une transmission de données à l'administration, ainsi que les données de paiement pour les prestations de services. Voir [l'e-reporting expliqué](/blog/e-reporting-definition-obligations).
 
 ## Comment les factures circulent-elles ?
 
