@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-// Émission obligatoire pour les PME/TPE françaises — la réception (1er
-// septembre 2026) est déjà obligatoire pour toutes les entreprises.
 function getDaysLeft(): number {
+  // PME, TPE and micro-entreprises must issue e-invoices from 1 Sept 2027.
   const deadline = new Date('2027-09-01T00:00:00Z');
   const now = new Date();
   const diff = deadline.getTime() - now.getTime();
