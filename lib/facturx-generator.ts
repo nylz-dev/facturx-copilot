@@ -13,6 +13,7 @@ export interface InvoiceParty {
   name: string;
   siret?: string;
   tvaNumber?: string;
+  email?: string;     // BT-34 / BT-49 : adresse électronique
   addressLine1?: string;
   city?: string;
   postalCode?: string;
@@ -36,6 +37,11 @@ export interface InvoiceData {
   buyer: InvoiceParty;
   lines: InvoiceLine[];
   notes?: string;
+  // Mentions obligatoires sur une facture française (art. L441-9 et L441-10
+  // du code de commerce), reprises telles qu'imprimées sur la facture source.
+  latePaymentPenalties?: string;   // PMD : pénalités de retard
+  recoveryFee?: string;            // PMT : indemnité forfaitaire de recouvrement
+  earlyPaymentDiscount?: string;   // AAB : escompte
   paymentMeans?: string;       // ex: "30" = virement, "31" = prélèvement
   iban?: string;
   bic?: string;
@@ -120,12 +126,20 @@ function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty, isSeller = f
   // SpecifiedLegalOrganization (BT-30 = SIRET) — AFTER Name
   // Seller: always emit (fallback 'N/A') to satisfy BR-CO-26 + BR-Z-02
   // Buyer: only if SIRET is available
-  if (isSeller) {
-    parentNode.ele('ram:SpecifiedLegalOrganization')
-      .ele('ram:ID').txt(siret ?? 'N/A').up();
-  } else if (siret) {
-    parentNode.ele('ram:SpecifiedLegalOrganization')
-      .ele('ram:ID').txt(siret).up();
+  // The French reform's Schematron (BR-FR-10) reads BT-30 as a SIREN: exactly
+  // 9 digits, carried under scheme 0002. A SIRET is that SIREN plus a 5-digit
+  // establishment number, so derive it rather than emitting the 14 digits.
+  const digits = siret?.replace(/\D/g, '');
+  const siren = digits && digits.length >= 9 ? digits.slice(0, 9) : undefined;
+
+  if (isSeller || siren) {
+    const legalOrg = parentNode.ele('ram:SpecifiedLegalOrganization');
+    if (siren) {
+      legalOrg.ele('ram:ID', { schemeID: '0002' }).txt(siren).up();
+    } else {
+      // Seller with no usable SIRET: still emit an ID to satisfy BR-CO-26
+      legalOrg.ele('ram:ID').txt('N/A').up();
+    }
   }
 
   // PostalTradeAddress — MANDATORY for both seller and buyer (BR-8, BR-10)
@@ -139,10 +153,26 @@ function addTradeParty(parentNode: XMLBuilder, party: InvoiceParty, isSeller = f
   if (city)  addr.ele('ram:CityName').txt(city);
   addr.ele('ram:CountryID').txt(str(party.country) ?? 'FR');
 
-  // SpecifiedTaxRegistration (TVA = BT-31) — after PostalTradeAddress
+  // Adresse électronique (BT-34 vendeur / BT-49 acheteur) — entre
+  // PostalTradeAddress et SpecifiedTaxRegistration dans l'ordre XSD.
+  const email = str(party.email);
+  if (email) {
+    parentNode.ele('ram:URIUniversalCommunication')
+      .ele('ram:URIID', { schemeID: 'EM' }).txt(email).up();
+  }
+
+  // SpecifiedTaxRegistration — after PostalTradeAddress
   if (tva) {
+    // BT-31 : Seller VAT identifier
     parentNode.ele('ram:SpecifiedTaxRegistration')
       .ele('ram:ID', { schemeID: 'VA' }).txt(tva).up();
+  } else if (isSeller && siret) {
+    // No VAT number (micro-entreprise en franchise en base de TVA): fall back to
+    // BT-32, the seller's tax registration identifier. BR-Z-02/BR-E-02 require
+    // one of BT-31/BT-32 as soon as a line is zero-rated or exempt, which is
+    // exactly the case for these sellers.
+    parentNode.ele('ram:SpecifiedTaxRegistration')
+      .ele('ram:ID', { schemeID: 'FC' }).txt(siret).up();
   }
 }
 
@@ -182,6 +212,24 @@ export function generateFacturXXML(invoice: InvoiceData): string {
   exDoc.ele('ram:TypeCode').txt('380');
   exDoc.ele('ram:IssueDateTime')
     .ele('udt:DateTimeString', { format: '102' }).txt(invoiceDate).up();
+
+  // Mentions légales françaises (BR-FR-05/BT-22). Elles ne sont émises que
+  // si elles figurent sur la facture source : inventer le texte reviendrait
+  // à modifier les conditions commerciales du vendeur.
+  const legalMentions: { code: string; text?: string }[] = [
+    { code: 'PMD', text: str(invoice.latePaymentPenalties) },
+    { code: 'PMT', text: str(invoice.recoveryFee) },
+    { code: 'AAB', text: str(invoice.earlyPaymentDiscount) },
+  ];
+  for (const mention of legalMentions) {
+    if (!mention.text) continue;
+    const note = exDoc.ele('ram:IncludedNote');
+    note.ele('ram:Content').txt(mention.text);
+    note.ele('ram:SubjectCode').txt(mention.code);
+  }
+  if (str(invoice.notes)) {
+    exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(str(invoice.notes)!).up();
+  }
   const notes = str(invoice.notes);
   if (notes) {
     exDoc.ele('ram:IncludedNote').ele('ram:Content').txt(notes).up();
@@ -241,13 +289,12 @@ export function generateFacturXXML(invoice: InvoiceData): string {
   if (invoice.iban) {
     const paymentInfo = settlement.ele('ram:SpecifiedTradeSettlementPaymentMeans');
     paymentInfo.ele('ram:TypeCode').txt(invoice.paymentMeans ?? '30');
+    // BT-86 (BIC) belongs to EN16931/EXTENDED, not BASIC: emitting
+    // PayeeSpecifiedCreditorFinancialInstitution here makes the document fail
+    // XSD validation against the BASIC profile. The IBAN alone carries the
+    // payment information.
     paymentInfo.ele('ram:PayeePartyCreditorFinancialAccount')
       .ele('ram:IBANID').txt(invoice.iban).up();
-    const bic = str(invoice.bic);
-    if (bic) {
-      paymentInfo.ele('ram:PayeeSpecifiedCreditorFinancialInstitution')
-        .ele('ram:BICID').txt(bic).up();
-    }
   }
 
   // 3. VAT breakdown
@@ -279,4 +326,37 @@ export function generateFacturXXML(invoice: InvoiceData): string {
   summary.ele('ram:DuePayableAmount').txt(computedGrandTotal.toFixed(2));
 
   return doc.end({ prettyPrint: true });
+}
+
+/**
+ * Data gaps that make the generated XML fail EN16931 validation. Nothing here
+ * can be fixed by the generator — the information simply isn't on the invoice —
+ * so the caller warns instead of handing back a document that receiving systems
+ * will reject.
+ */
+export function findConformanceGaps(invoice: InvoiceData): string[] {
+  const gaps: string[] = [];
+
+  // BR-CO-26 / BR-S-02 / BR-Z-02: the seller needs at least one tax or legal
+  // identifier, whatever the VAT category of the lines.
+  if (!str(invoice.seller.tvaNumber) && !str(invoice.seller.siret)) {
+    gaps.push("le SIRET et le numéro de TVA du vendeur sont absents (au moins l'un des deux est exigé)");
+  }
+
+  // BR-FR-05/BT-22 : mentions obligatoires sur toute facture française.
+  const missingMentions = [
+    !str(invoice.latePaymentPenalties) && 'pénalités de retard',
+    !str(invoice.recoveryFee) && 'indemnité forfaitaire de recouvrement',
+    !str(invoice.earlyPaymentDiscount) && 'escompte',
+  ].filter(Boolean) as string[];
+  if (missingMentions.length > 0) {
+    gaps.push(`mentions légales absentes de la facture source : ${missingMentions.join(', ')}`);
+  }
+
+  // BR-FR-12/BT-49 et BR-FR-13/BT-34 : adresses électroniques des parties.
+  if (!str(invoice.seller.email) || !str(invoice.buyer.email)) {
+    gaps.push("adresse électronique du vendeur ou de l'acheteur absente");
+  }
+
+  return gaps;
 }

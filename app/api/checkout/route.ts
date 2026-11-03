@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-
-const PRICE_IDS: Record<string, string> = {
-  pro: "price_1TBKOaCSseW7QqXy6oTvxuNI",
-  cabinet: "price_1TBKOhCSseW7QqXyzSoliJG5",
-};
+import { PRICE_IDS, SubscriptionPlan } from "@/lib/stripe-plans";
 
 export async function POST(req: NextRequest) {
   try {
-    const { plan } = await req.json();
-    const priceId = PRICE_IDS[plan];
+    const { plan } = (await req.json()) as { plan?: SubscriptionPlan };
+    const priceId = plan ? PRICE_IDS[plan] : undefined;
 
     if (!priceId) {
       return NextResponse.json({ error: "Plan invalide." }, { status: 400 });

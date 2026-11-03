@@ -1,12 +1,17 @@
 /**
- * Single-use 1€ token management.
+ * Single-use 1€ token verification.
  * Token = Stripe Checkout Session ID.
- * Usage tracked in module-scope Set (resets on cold start — acceptable for MVP).
+ * Usage is tracked in Postgres (facturx_tokens, unique constraint on
+ * token) so it can't be replayed across serverless instances or after
+ * a cold start. Without the service-role key it degrades to an in-process
+ * Set — replayable after a cold start, as it was before, but the Stripe
+ * payment itself is still verified on every call.
  */
 
 import Stripe from 'stripe';
+import { getSupabaseAdmin } from './supabase-admin';
 
-const usedTokens = new Set<string>();
+const usedTokensInMemory = new Set<string>();
 
 export async function verifyAndConsumeToken(
   sessionId: string,
@@ -15,11 +20,6 @@ export async function verifyAndConsumeToken(
   // Basic format check
   if (!sessionId || !sessionId.startsWith('cs_')) {
     return { valid: false, error: 'Token invalide.' };
-  }
-
-  // Already used in this instance
-  if (usedTokens.has(sessionId)) {
-    return { valid: false, error: 'Token déjà utilisé.' };
   }
 
   try {
@@ -42,8 +42,27 @@ export async function verifyAndConsumeToken(
       return { valid: false, error: 'Montant de paiement invalide.' };
     }
 
-    // Mark as used
-    usedTokens.add(sessionId);
+    // Atomically mark as used — fails if already consumed
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      if (usedTokensInMemory.has(sessionId)) {
+        return { valid: false, error: 'Token déjà utilisé.' };
+      }
+      usedTokensInMemory.add(sessionId);
+      return { valid: true };
+    }
+
+    const { data: consumed, error } = await supabase.rpc('facturx_consume_token', {
+      p_token: sessionId,
+    });
+
+    if (error) {
+      return { valid: false, error: 'Erreur de vérification du token.' };
+    }
+    if (!consumed) {
+      return { valid: false, error: 'Token déjà utilisé.' };
+    }
+
     return { valid: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Erreur Stripe';
