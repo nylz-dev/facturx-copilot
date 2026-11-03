@@ -28,7 +28,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Webhook signature verification failed: ${msg}` }, { status: 400 });
   }
 
+  // Subscriber state cannot be faked in memory: a webhook we could not record
+  // must fail loudly so Stripe retries it once the store is configured.
   const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    console.error('[stripe-webhook] SUPABASE_SERVICE_ROLE_KEY absente : événement non enregistré.');
+    return NextResponse.json(
+      { error: 'Persistance des abonnés non configurée.' },
+      { status: 503 }
+    );
+  }
 
   try {
     switch (event.type) {

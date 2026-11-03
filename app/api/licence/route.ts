@@ -37,6 +37,12 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Persistance des abonnés non configurée.' },
+        { status: 503 }
+      );
+    }
 
     // The Stripe webhook writes the subscriber row asynchronously —
     // give it a few short retries before reporting "not ready yet".

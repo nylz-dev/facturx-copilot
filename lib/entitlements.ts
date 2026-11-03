@@ -18,7 +18,11 @@ export async function getEntitlementByLicenceKey(
 ): Promise<Entitlement | null> {
   if (!licenceKey) return null;
 
+  // No store configured: a licence cannot be verified, so none is granted.
+  // The caller falls back to the free quota rather than to unmetered access.
   const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
   const { data, error } = await supabase
     .from('facturx_subscribers')
     .select('email, plan, status')
