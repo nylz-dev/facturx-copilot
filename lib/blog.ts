@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { marked } from 'marked';
+import { addHeadingIds, formatDateShort, readingMinutes, stripLeadingH1, wrapKeyTakeaways, type PostSummary, type TocItem } from '@/lib/blog-utils';
 import { supabaseBlog } from '@/lib/supabase-blog';
 
 // Articles live in content/blog/*.md so the blog never depends on a database
@@ -24,6 +25,16 @@ export interface Post {
   updatedAt: string;
   html: string;
   faq: Faq[];
+  cover?: string;
+  readingMinutes: number;
+  toc: TocItem[];
+}
+
+// Heading ids (anchors + table of contents), the "En bref" callout and the reading time.
+function enrich(rawHtml: string) {
+  const html = stripLeadingH1(rawHtml);
+  const { html: withIds, toc } = addHeadingIds(html);
+  return { html: wrapKeyTakeaways(withIds), toc, readingMinutes: readingMinutes(html) };
 }
 
 function parseFrontmatter(raw: string): { data: Record<string, string>; body: string } {
@@ -66,8 +77,9 @@ function readLocalPosts(): Post[] {
         category: data.category || 'Guide',
         publishedAt: data.date,
         updatedAt: data.updated || data.date,
-        html: marked.parse(body, { async: false }) as string,
+        ...enrich(marked.parse(body, { async: false }) as string),
         faq: extractFaq(body),
+        cover: data.cover || undefined,
       };
     });
 }
@@ -92,8 +104,9 @@ async function readRemotePosts(): Promise<Post[]> {
       category: a.category || 'Guide',
       publishedAt: a.published_at || a.created_at,
       updatedAt: a.updated_at || a.published_at || a.created_at,
-      html: /^\s*</.test(a.content) ? a.content : (marked.parse(a.content, { async: false }) as string),
+      ...enrich(/^\s*</.test(a.content) ? a.content : (marked.parse(a.content, { async: false }) as string)),
       faq: [],
+      cover: a.cover_image || undefined,
     }));
   } catch {
     return [];
@@ -119,4 +132,24 @@ export async function getRelatedPosts(post: Post, limit = 3): Promise<Post[]> {
 
 export function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+export function toSummary(post: Post): PostSummary {
+  return {
+    slug: post.slug,
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    publishedAt: post.publishedAt,
+    dateLabel: formatDateShort(post.publishedAt),
+    readingMinutes: post.readingMinutes,
+    cover: post.cover,
+  };
+}
+
+// Categories with their post count, most used first.
+export function getCategories(posts: Post[]): { name: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const p of posts) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'fr'));
 }
